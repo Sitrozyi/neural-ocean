@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ['main'] # mainブランチにプッシュされた時に実行
+    branches: ['main'] 
 
 permissions:
   contents: read
