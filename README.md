@@ -9,7 +9,7 @@ Deep-sea ecosystem sandbox driven by small neural networks and genetic mutations
 ## Controls
 
 - `Z`, `X`, `C`, `V`, `B` : Simulation speed (0x - 6x)
-- `1` - `5` : Tools (Inspect, Feed, Meteor, Larva, Apex)
+- `1` - `5` : Tools (Inspect, Feed, Meteor, Spawn Larva, Spawn Apex)
 - `T` : Menu (Tools, Catalog, Save slots)
 - `Space` : Reset camera / Deselect
 - `Left drag` / `Wheel` : Pan / Zoom
