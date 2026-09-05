@@ -1,2 +1,2 @@
 browser-based ocean life sandbox.
-![fish](./fish1.gif)
+![fish](assets/fish1.gif)
