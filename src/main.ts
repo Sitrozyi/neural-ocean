@@ -1007,6 +1007,162 @@ function drawLeviathan(c: Creature, isSilhouette = false) {
   ctx.restore();
   ctx.restore();
 }
+function drawManta(c: Creature, isSilhouette = false) {
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.rotate(c.angle);
+
+  const currentSize = c.dna.size * (0.35 + 0.65 * c.growth);
+  const flap = Math.sin(c.finPhase * 0.7) * 0.28;
+
+  ctx.fillStyle = isSilhouette ? '#0f172a' : '#031728';
+  ctx.strokeStyle = isSilhouette ? '#334155' : '#38bdf8';
+  ctx.lineWidth = 1.8;
+
+  ctx.beginPath();
+  ctx.moveTo(currentSize * 1.8, 0);
+  ctx.lineTo(currentSize * 0.5, -currentSize * (2.8 + flap * 2.0));
+  ctx.lineTo(-currentSize * 1.2, -currentSize * (1.8 + flap * 1.2));
+  ctx.lineTo(-currentSize * 1.8, 0);
+  ctx.lineTo(-currentSize * 1.2, currentSize * (1.8 + flap * 1.2));
+  ctx.lineTo(currentSize * 0.5, currentSize * (2.8 + flap * 2.0));
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  if (!isSilhouette) {
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+    ctx.lineWidth = 1.2;
+    for (let s = -1; s <= 1; s += 2) {
+      for (let g = 0; g < 3; g++) {
+        const gx = -currentSize * 0.4 + g * currentSize * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(gx, s * currentSize * 0.4);
+        ctx.lineTo(gx - currentSize * 0.3, s * currentSize * 1.2);
+        ctx.stroke();
+      }
+    }
+
+    ctx.fillStyle = '#38bdf8';
+    for (let s = -1; s <= 1; s += 2) {
+      ctx.beginPath();
+      ctx.moveTo(currentSize * 1.7, s * currentSize * 0.35);
+      ctx.quadraticCurveTo(currentSize * 2.6, s * currentSize * 0.7, currentSize * 2.4, s * currentSize * 0.2);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  const whipWave = Math.sin(c.finPhase * 1.1) * currentSize * 0.4;
+  ctx.strokeStyle = isSilhouette ? '#334155' : '#38bdf8';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(-currentSize * 1.8, 0);
+  ctx.quadraticCurveTo(-currentSize * 3.5, whipWave, -currentSize * 5.2, whipWave * 1.6);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawCleanerShrimp(c: Creature, isSilhouette = false) {
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.rotate(c.angle);
+
+  const currentSize = c.dna.size * (0.35 + 0.65 * c.growth);
+  const legWave = Math.sin(c.legPhase) * currentSize * 0.3;
+
+  ctx.strokeStyle = isSilhouette ? '#334155' : '#ffffff';
+  ctx.lineWidth = 1.0;
+  for (let s = -1; s <= 1; s += 2) {
+    ctx.beginPath();
+    ctx.moveTo(currentSize * 1.2, s * currentSize * 0.2);
+    ctx.quadraticCurveTo(currentSize * 2.2, s * currentSize * 1.8 + legWave, currentSize * 3.0, s * currentSize * 2.2);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = isSilhouette ? '#0f172a' : '#f472b6';
+  ctx.strokeStyle = isSilhouette ? '#334155' : '#fda4af';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, currentSize * 1.4, currentSize * 0.65, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  if (!isSilhouette) {
+    ctx.fillStyle = '#ffffff';
+    for (let b = -1; b <= 1; b++) {
+      ctx.fillRect(b * currentSize * 0.6 - 1.5, -currentSize * 0.6, 3, currentSize * 1.2);
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawWhaleFall(p: Plant) {
+  ctx.save();
+  ctx.translate(p.x, p.y);
+
+  ctx.fillStyle = 'rgba(14, 116, 144, 0.25)';
+  ctx.beginPath();
+  ctx.arc(0, 0, p.size * 1.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(226, 232, 240, 0.85)';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(-p.size * 1.1, 0);
+  ctx.lineTo(p.size * 1.1, 0);
+  ctx.stroke();
+
+  const ribCount = 5;
+  for (let i = 0; i < ribCount; i++) {
+    const rx = (i - (ribCount - 1) / 2) * (p.size * 0.45);
+    const rHeight = p.size * (0.9 - Math.abs(i - 2) * 0.2);
+    ctx.beginPath();
+    ctx.moveTo(rx, -rHeight);
+    ctx.quadraticCurveTo(rx + 4, 0, rx, rHeight);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#38bdf8';
+  ctx.beginPath();
+  ctx.arc(0, 0, p.size * 0.25, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawKelp(kelp: Kelp) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(16, 185, 129, 0.55)';
+  ctx.lineWidth = 4.0;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(kelp.nodes[0].x, kelp.nodes[0].y);
+  for (let s = 1; s < kelp.nodes.length; s++) {
+    ctx.lineTo(kelp.nodes[s].x, kelp.nodes[s].y);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(52, 211, 153, 0.4)';
+  for (let s = 1; s < kelp.nodes.length; s++) {
+    const n = kelp.nodes[s];
+    const prev = kelp.nodes[s - 1];
+    const ang = Math.atan2(n.y - prev.y, n.x - prev.x);
+    for (let side = -1; side <= 1; side += 2) {
+      ctx.save();
+      ctx.translate(n.x, n.y);
+      ctx.rotate(ang + side * 0.8);
+      ctx.beginPath();
+      ctx.ellipse(12, 0, 14, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
 function drawFishCreature(c: Creature, isSilhouette = false) {
   ctx.save();
   const [r, g, b] = c.dna.color;
@@ -1487,6 +1643,10 @@ function drawSpeciesPreview(catalogItem: SpeciesCatalogItem, isDiscovered: boole
       drawScavenger(c);
     } else if (c.type === 'chimera') {
       drawLeviathan(c);
+    } else if (c.type === 'manta') {
+      drawManta(c);
+    } else if (c.type === 'cleaner_shrimp') {
+      drawCleanerShrimp(c);
     } else {
       drawFishCreature(c);
     }
@@ -1808,6 +1968,11 @@ function loop(time: number) {
     oceanGrad.addColorStop(1, '#01050a');
     ctx.fillStyle = oceanGrad;
     ctx.fillRect(0, 0, world.width, world.height);
+    for (const kelp of world.kelps) {
+      if (isInView(kelp.baseX, kelp.baseY - kelp.height / 2, kelp.height / 2 + 50)) {
+        drawKelp(kelp);
+      }
+    }
     for (const obs of world.obstacles) {
       if (isInView(obs.x, obs.y, obs.radius + 30)) drawObstacle(obs);
     }
@@ -1815,17 +1980,21 @@ function loop(time: number) {
       if (isInView(egg.x, egg.y, 20)) drawEgg(egg);
     }
     for (const p of world.plants) {
-      if (!isInView(p.x, p.y, 15)) continue;
-      ctx.beginPath();
-      if (p.type === 'meat_remains') {
+      if (!isInView(p.x, p.y, p.size + 20)) continue;
+      if (p.type === 'whale_fall') {
+        drawWhaleFall(p);
+      } else if (p.type === 'meat_remains') {
+        ctx.beginPath();
         ctx.fillStyle = '#f43f5e';
         ctx.arc(p.x, p.y, Math.max(3.2, p.size * 1.1), 0, Math.PI * 2);
         ctx.fill();
       } else if (p.type === 'fruit') {
+        ctx.beginPath();
         ctx.fillStyle = '#f59e0b';
         ctx.arc(p.x, p.y, Math.max(3.0, p.size * 1.0), 0, Math.PI * 2);
         ctx.fill();
       } else {
+        ctx.beginPath();
         ctx.fillStyle = 'rgba(16, 185, 129, 0.42)';
         ctx.arc(p.x, p.y, p.size * 0.95, 0, Math.PI * 2);
         ctx.fill();
@@ -1967,7 +2136,7 @@ function loop(time: number) {
       ctx.lineWidth = 1.5;
       ctx.strokeRect(hudX, hudY, hudW, hudH);
 
-      const typeIcon = sc.type === 'solar_jelly' ? '[JELLY]' : sc.type === 'scavenger' ? '[SCAVENGER]' : sc.type === 'chimera' ? '[APEX]' : sc.dna.diet > 0.5 ? '[CARNIVORE]' : '[HERBIVORE]';
+      const typeIcon = sc.type === 'solar_jelly' ? '[JELLY]' : sc.type === 'scavenger' ? '[SCAVENGER]' : sc.type === 'chimera' ? '[APEX LEVIATHAN]' : sc.type === 'manta' ? '[ABYSS MANTA]' : sc.type === 'cleaner_shrimp' ? '[CLEANER SHRIMP]' : sc.dna.diet > 0.5 ? '[CARNIVORE]' : '[HERBIVORE]';
       const stageStr = sc.stage === 'larva' ? `Larva (${(sc.growth * 100).toFixed(0)}%)` : 'Adult';
 
       ctx.fillStyle = sc.dna.diet > 0.5 ? '#f87171' : '#38bdf8';
