@@ -1,4 +1,4 @@
-browser-based ocean life sandbox.
+Ocean life sandbox.
 -------------
 z, x, c, v, b  : Change speed.
 
