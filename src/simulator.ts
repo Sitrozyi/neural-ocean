@@ -1208,6 +1208,9 @@ export class EcosystemWorld {
         kelp.nodes[s].x = kelp.baseX + sway;
         kelp.nodes[s].y = kelp.baseY - s * segLen;
       }
+      if (Math.random() < 0.003 && this.plants.length < 450) {
+        this.spawnPlant(kelp.baseX + (Math.random() - 0.5) * 40, kelp.baseY - Math.random() * kelp.height * 0.7, 'algae');
+      }
     }
 
     this.naturalSpawnTimer += dt;
@@ -1318,6 +1321,15 @@ export class EcosystemWorld {
 
       const currentSize = c.dna.size * (0.35 + 0.65 * c.growth);
       c.maxEnergy = currentSize * 22 + 40;
+
+      let inKelp = false;
+      for (const kelp of this.kelps) {
+        if (Math.abs(c.x - kelp.baseX) < 45 && c.y >= kelp.baseY - kelp.height && c.y <= kelp.baseY + 20) {
+          inKelp = true;
+          break;
+        }
+      }
+      const isHiddenInKelp = inKelp && currentSize < 8.5;
 
       if (c.stunTimer > 0) {
         c.stunTimer -= dt;
@@ -1441,8 +1453,17 @@ export class EcosystemWorld {
           }
         }
 
+        let otherInKelp = false;
+        for (const kelp of this.kelps) {
+          if (Math.abs(other.x - kelp.baseX) < 45 && other.y >= kelp.baseY - kelp.height && other.y <= kelp.baseY + 20) {
+            otherInKelp = true;
+            break;
+          }
+        }
+        const otherHidden = otherInKelp && (other.dna.size * (0.35 + 0.65 * other.growth)) < 8.5;
+
         const isEdible = (other.type === 'herbivore' || other.stage === 'larva' || (isStarving && other.type === 'solar_jelly')) && other.type !== 'cleaner_shrimp';
-        if (isCarnivore && isEdible && d < minPrD && (other.dna.camouflage < 0.65 || Math.random() < 0.2)) {
+        if (isCarnivore && isEdible && d < minPrD && !otherHidden && (other.dna.camouflage < 0.65 || Math.random() < 0.15)) {
           minPrD = d;
           closestPreyAngle = relAng / Math.PI;
           closestPreyDist = d / c.dna.senseRadius;
