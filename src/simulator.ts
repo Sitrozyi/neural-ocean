@@ -259,146 +259,146 @@ export interface SpeciesCatalogItem {
 export const SPECIES_CATALOG: SpeciesCatalogItem[] = [
   {
     id: 'titan',
-    name: 'タイタンホーン',
-    category: '巨大角種',
-    condition: '体サイズ14以上',
-    desc: '巨大な頭角と圧倒的体躯を誇る深海の巨獣。高い生命力と装甲で敵を圧倒する。',
+    name: 'Titan Horn',
+    category: 'Megafauna',
+    condition: 'Size >= 14',
+    desc: 'Massive armored behemoth dominating deep waters.',
     previewDna: { size: 14.5, color: [45, 185, 150], diet: 0.2, segments: 6, armor: 0.5 }
   },
   {
     id: 'swift',
-    name: '迅雷フィン',
-    category: '高速突撃種',
-    condition: '遊泳速度4.5以上',
-    desc: '流線型の推進ヒレを進化させ、海中を矢のように疾走する俊足の遊泳者。',
+    name: 'Swift Fin',
+    category: 'Speedster',
+    condition: 'Speed >= 4.5',
+    desc: 'Streamlined agile swimmer darting through open currents.',
     previewDna: { speed: 4.8, size: 5.5, color: [56, 189, 248], diet: 0.3, segments: 5, turnSpeed: 0.18 }
   },
   {
     id: 'venom',
-    name: 'アビスバイパー',
-    category: '猛毒棘種',
-    condition: '猛毒0.75以上',
-    desc: '高濃度の神経毒を背鰭の棘に蓄えた危険種。捕食者を返り討ちにする。',
+    name: 'Abyss Viper',
+    category: 'Venomous',
+    condition: 'Poison >= 0.75',
+    desc: 'Carries potent neurotoxin in its dorsal spines.',
     previewDna: { size: 7.2, color: [168, 85, 247], poison: 0.85, diet: 0.4, segments: 6 }
   },
   {
     id: 'aegis',
-    name: '金剛シェル',
-    category: '重装甲種',
-    condition: '装甲0.8以上',
-    desc: '外敵の牙をことごとく弾き返す重層甲殻プレートを纏った鉄壁の魚。',
+    name: 'Aegis Shell',
+    category: 'Armored',
+    condition: 'Armor >= 0.8',
+    desc: 'Heavy layered plates repelling predator fangs.',
     previewDna: { size: 8.2, color: [56, 189, 248], armor: 0.88, diet: 0.15, segments: 4 }
   },
   {
     id: 'elder',
-    name: '深海の長老',
-    category: '長寿古代種',
-    condition: '最大寿命100以上',
-    desc: '過酷な淘汰を何世代にもわたり生き延びる強靭な古代遺伝子保持者。',
+    name: 'Deep Elder',
+    category: 'Ancient',
+    condition: 'Lifespan >= 100',
+    desc: 'Resilient lineage enduring across generations.',
     previewDna: { size: 9.0, color: [148, 163, 184], maxAge: 120, diet: 0.25, segments: 5 }
   },
   {
     id: 'reaper',
-    name: '冥王リヴァイアサン',
-    category: '狂乱捕食種',
-    condition: '討伐数8以上',
-    desc: '無数の獲物を屠り生態系の頂点に君臨する狂乱の深海覇者。',
+    name: 'Reaper Leviathan',
+    category: 'Apex Predator',
+    condition: 'Kills >= 8',
+    desc: 'Frenzied hunter ruling the top of the food chain.',
     previewDna: { size: 12.5, color: [239, 68, 68], diet: 0.95, biteForce: 0.9, segments: 6 }
   },
   {
     id: 'photon',
-    name: 'フォトンクラゲ',
-    category: '共生光化種',
-    condition: '光合成0.75以上',
-    desc: '体内に葉緑素を高密度共生させ、光エネルギーのみで生存可能な浮遊生命。',
+    name: 'Photon Jelly',
+    category: 'Photosynthetic',
+    condition: 'Photosynthesis >= 0.75',
+    desc: 'Floating organism fueled directly by light energy.',
     previewDna: { size: 7.5, color: [52, 211, 153], photosynthesis: 0.85, diet: 0.0 }
   },
   {
     id: 'aurum',
-    name: '黄金変異種',
-    category: '伝説黄金種',
-    condition: '黄金色の体色',
-    desc: '極めて稀な色素突然変異によって黄金の輝きを放つ神秘の個体。',
+    name: 'Golden Morph',
+    category: 'Legendary',
+    condition: 'Golden Color',
+    desc: 'Ultra-rare genetic mutation with radiant golden glow.',
     previewDna: { size: 7.0, color: [245, 158, 11], diet: 0.3, segments: 5 }
   },
   {
     id: 'brood',
-    name: '群生マザー',
-    category: '多産母胎種',
-    condition: '多産r戦略(0.15以下)',
-    desc: '一度に無数の卵塊を産み落とし、広大な海域を子孫で埋め尽くす母胎。',
+    name: 'Brood Mother',
+    category: 'Prolific',
+    condition: 'r-Strategy <= 0.15',
+    desc: 'Spawns dense egg clusters to rapidly populate waters.',
     previewDna: { size: 6.8, color: [244, 114, 182], rkStrategy: 0.1, diet: 0.1, segments: 4 }
   },
   {
     id: 'phantom',
-    name: 'ファントムシーカー',
-    category: '深淵擬態種',
-    condition: '擬態度0.75以上',
-    desc: '半透明の体組織で背景の深淵に同化し、敵や獲物の目を完全に欺く幽霊魚。',
+    name: 'Phantom Seeker',
+    category: 'Camouflage',
+    condition: 'Camouflage >= 0.75',
+    desc: 'Translucent tissue blending seamlessly with the dark.',
     previewDna: { size: 6.0, color: [100, 116, 139], camouflage: 0.85, diet: 0.35, segments: 4 }
   },
   {
     id: 'dynamo',
-    name: '雷帝エレクトロ',
-    category: '帯電放電種',
-    condition: '放電能力0.75以上',
-    desc: '高圧放電パルスで周囲の遊泳生物を麻痺させ捕食・防衛を行う発電魚。',
+    name: 'Electro Dynamo',
+    category: 'Electric',
+    condition: 'Electric Shock >= 0.75',
+    desc: 'Emits high-voltage pulses to paralyze nearby threats.',
     previewDna: { size: 7.8, color: [250, 204, 21], electricShock: 0.88, diet: 0.45, segments: 5 }
   },
   {
     id: 'abyss_eye',
-    name: '深淵の千里眼',
-    category: '広域知覚種',
-    condition: '感知半径260以上',
-    desc: '超高感度の感覚器官により、広大な暗黒水域のあらゆる動体を捉える。',
+    name: 'Abyss Eye',
+    category: 'Wide Sensor',
+    condition: 'Sense Radius >= 260',
+    desc: 'High-sensitivity organs detecting distant movements.',
     previewDna: { size: 6.8, color: [14, 165, 233], senseRadius: 280, diet: 0.2, segments: 4 }
   },
   {
     id: 'needle_jaw',
-    name: '鬼牙ニードル',
-    category: '強顎咬合種',
-    condition: '咬合力0.85以上',
-    desc: '重装甲をも噛み砕く無数の針状牙を備えた肉食凶暴種。',
+    name: 'Needle Jaw',
+    category: 'Biter',
+    condition: 'Bite Force >= 0.85',
+    desc: 'Sharp needle teeth capable of puncturing thick shells.',
     previewDna: { size: 8.8, color: [225, 29, 72], biteForce: 0.92, diet: 0.9, segments: 5 }
   },
   {
     id: 'crimson_beast',
-    name: '紅蓮のキメラ',
-    category: '紅蓮頂点種',
-    condition: '肉食かつ体サイズ11以上',
-    desc: '深紅の巨大な体と巨大ブレードフィンで海域を制圧する巨獣。',
+    name: 'Crimson Chimera',
+    category: 'Apex Chimera',
+    condition: 'Carnivore & Size >= 11',
+    desc: 'Crimson giant dominating the ocean territory.',
     previewDna: { size: 12.0, color: [190, 18, 60], diet: 0.9, biteForce: 0.8, segments: 7 }
   },
   {
     id: 'crawler',
-    name: '深海スカベンジャー',
-    category: '装甲底生種',
-    condition: '掃除屋かつ装甲0.7以上',
-    desc: '頑強な甲殻と強靭なハサミで海底に沈む有機物を解体・摂食する掃除屋。',
+    name: 'Abyss Scavenger',
+    category: 'Benthic',
+    condition: 'Scavenger & Armor >= 0.7',
+    desc: 'Armored bottom-dweller consuming organic remains.',
     previewDna: { size: 6.0, color: [217, 119, 6], scavengerDrive: 0.95, armor: 0.8, diet: 0.1 }
   },
   {
     id: 'siren',
-    name: '幻惑セイレーン',
-    category: '高機動旋回種',
-    condition: '旋回速度0.22以上',
-    desc: '驚異的な旋回性能とリボンフィンで捕食者の追撃を瞬時に回避する。',
+    name: 'Phantom Siren',
+    category: 'Agile Swimmer',
+    condition: 'Turn Speed >= 0.22',
+    desc: 'Exceptional maneuverability ribbon fins avoiding attacks.',
     previewDna: { speed: 3.6, turnSpeed: 0.25, size: 5.8, color: [192, 132, 252], diet: 0.2, segments: 5 }
   },
   {
     id: 'leviathan',
-    name: '始祖竜オロチ',
-    category: '多節巨竜種',
-    condition: '体節数7かつ体長10以上',
-    desc: '7つの節球が連なる長大な龍体をくねらせ、深海の主として君臨する古代種。',
+    name: 'Ancestral Orochi',
+    category: 'Serpentine',
+    condition: '7 Segments & Size >= 10',
+    desc: 'Seven-segmented serpentine ancient ruler of the abyss.',
     previewDna: { size: 10.8, color: [13, 148, 136], segments: 7, diet: 0.65 }
   },
   {
     id: 'biolume',
-    name: '深海ランタン',
-    category: '生物発光種',
-    condition: '青色発光体かつ光合成0.6以上',
-    desc: '頭部に青白い自家発光器を備え、暗黒の深海で光合成と誘引を行う神秘種。',
+    name: 'Abyss Lantern',
+    category: 'Bioluminescent',
+    condition: 'Cyan Glow & Photosyn >= 0.6',
+    desc: 'Bioluminescent lure aiding photosynthesis and attraction.',
     previewDna: { size: 6.6, color: [34, 211, 238], photosynthesis: 0.75, diet: 0.15, segments: 4 }
   }
 ];
@@ -988,11 +988,11 @@ export class EcosystemWorld {
   getSlotSummary(slot: number): string {
     try {
       const raw = localStorage.getItem(`biocosmos_slot_${slot}`) || (slot === 1 ? localStorage.getItem('biocosmos_world_state') : null);
-      if (!raw) return '空スロット';
+      if (!raw) return 'Empty Slot';
       const d = JSON.parse(raw);
-      return `Gen.${d.maxGen || 1} (${d.creatures?.length || 0}匹) ${d.savedAt || ''}`;
+      return `Gen.${d.maxGen || 1} (${d.creatures?.length || 0} orgs) ${d.savedAt || ''}`;
     } catch (_) {
-      return '空スロット';
+      return 'Empty Slot';
     }
   }
 

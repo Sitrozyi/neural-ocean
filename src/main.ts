@@ -224,16 +224,16 @@ canvas.addEventListener('mousedown', (e) => {
         const sy = bY + 28 + (s - 1) * (isCompact ? 42 : 48);
         if (mx >= bX + bW - 100 && mx <= bX + bW - 60 && my >= sy + 6 && my <= sy + 28) {
           world.saveWorldState(s);
-          systemMessage = `スロット ${s} に保存しました`;
+          systemMessage = `Saved to Slot ${s}`;
           systemMessageTimer = 2.0;
           return;
         }
         if (mx >= bX + bW - 52 && mx <= bX + bW - 12 && my >= sy + 6 && my <= sy + 28) {
           if (world.loadWorldState(s)) {
-            systemMessage = `スロット ${s} を復元しました`;
+            systemMessage = `Loaded Slot ${s}`;
             selectedCreature = null;
           } else {
-            systemMessage = `スロット ${s} は空です`;
+            systemMessage = `Slot ${s} is empty`;
           }
           systemMessageTimer = 2.0;
           return;
@@ -287,7 +287,7 @@ canvas.addEventListener('mousedown', (e) => {
         selectedCreature = lm;
         targetCamX = lm.x - viewW / (2 * zoom);
         targetCamY = lm.y - viewH / (2 * zoom);
-        systemMessage = `変異種 #${lm.id} にフォーカス`;
+        systemMessage = `Focus: Mutant #${lm.id}`;
         systemMessageTimer = 2.0;
         return;
       }
@@ -400,7 +400,7 @@ canvas.addEventListener('touchstart', (e) => {
         selectedCreature = lm;
         targetCamX = lm.x - viewW / (2 * zoom);
         targetCamY = lm.y - viewH / (2 * zoom);
-        systemMessage = `変異種 #${lm.id} にフォーカス`;
+        systemMessage = `Focus: Mutant #${lm.id}`;
         systemMessageTimer = 2.0;
         e.preventDefault();
         return;
@@ -446,16 +446,16 @@ canvas.addEventListener('touchstart', (e) => {
         const sy = dY + 28 + (s - 1) * (isCompact ? 42 : 48);
         if (mx >= dX + dW - 105 && mx <= dX + dW - 63 && my >= sy + 4 && my <= sy + 30) {
           world.saveWorldState(s);
-          systemMessage = `スロット ${s} 保存完了`;
+          systemMessage = `Saved Slot ${s}`;
           systemMessageTimer = 2.0;
           e.preventDefault(); return;
         }
         if (mx >= dX + dW - 55 && mx <= dX + dW - 13 && my >= sy + 4 && my <= sy + 30) {
           if (world.loadWorldState(s)) {
-            systemMessage = `スロット ${s} 読込完了`;
+            systemMessage = `Loaded Slot ${s}`;
             selectedCreature = null;
           } else {
-            systemMessage = `スロット ${s} 空`;
+            systemMessage = `Slot ${s} empty`;
           }
           systemMessageTimer = 2.0;
           e.preventDefault(); return;
@@ -1099,7 +1099,7 @@ function drawFishCreature(c: Creature, isSilhouette = false) {
 
   ctx.restore();
   ctx.restore();
-  ctx.shadowBlur = 0; // 他の描画への影引き継ぎを防止
+  ctx.shadowBlur = 0;
 }
 function drawSpeciesPreview(catalogItem: SpeciesCatalogItem, isDiscovered: boolean, cx: number, cy: number, scale: number) {
   ctx.save();
@@ -1263,23 +1263,23 @@ function drawSpeciesPreview(catalogItem: SpeciesCatalogItem, isDiscovered: boole
     const inVals = brain.lastInputs;
     const outVals = brain.lastOutputs;
 
-    let thoughtText = 'のんびり遊泳中';
+    let thoughtText = 'Cruising';
     let thoughtColor = '#94a3b8';
 
     if (inVals[2] > 0.35 || inVals[3] > 0.4) {
-      thoughtText = '天敵から逃走中';
+      thoughtText = 'Fleeing Predator';
       thoughtColor = '#f43f5e';
     } else if (inVals[9] > 0.4) {
-      thoughtText = '警戒態勢!';
+      thoughtText = 'Alert!';
       thoughtColor = '#f59e0b';
     } else if (inVals[4] > 0.35) {
-      thoughtText = '獲物を追跡中';
+      thoughtText = 'Hunting Prey';
       thoughtColor = '#c084fc';
     } else if (inVals[0] > 0.2 || inVals[1] > 0.3) {
-      thoughtText = 'エサを探している';
+      thoughtText = 'Searching Food';
       thoughtColor = '#38bdf8';
     } else if (inVals[8] > 0.4) {
-      thoughtText = '探索中';
+      thoughtText = 'Exploring';
       thoughtColor = '#a855f7';
     }
 
@@ -1291,13 +1291,13 @@ function drawSpeciesPreview(catalogItem: SpeciesCatalogItem, isDiscovered: boole
       ctx.strokeRect(startX, startY, 195, 16);
       ctx.fillStyle = thoughtColor;
       ctx.font = 'bold 9px monospace';
-      ctx.fillText(`状態: ${thoughtText}`, startX + 4, startY + 11);
+      ctx.fillText(`State: ${thoughtText}`, startX + 4, startY + 11);
 
       const compactOuts = [
-        { label: '旋回', val: Math.abs(outVals[0] || 0) },
-        { label: '前進', val: outVals[1] || 0 },
-        { label: '突進', val: outVals[2] || 0 },
-        { label: '電撃', val: outVals[3] || 0 }
+        { label: 'Steer', val: Math.abs(outVals[0] || 0) },
+        { label: 'Thrust', val: outVals[1] || 0 },
+        { label: 'Sprint', val: outVals[2] || 0 },
+        { label: 'Shock', val: outVals[3] || 0 }
       ];
       compactOuts.forEach((item, idx) => {
         const bx = startX + (idx % 2) * 98;
@@ -1313,8 +1313,8 @@ function drawSpeciesPreview(catalogItem: SpeciesCatalogItem, isDiscovered: boole
       return;
     }
 
-    const inLabels = ['エサの気配', 'エサの距離', '天敵の接近', '天敵の距離', '獲物の気配', '獲物の距離', '空腹度', '岩への接近', '短期キオク', '仲間の警報'];
-    const outLabels = ['曲がる', '前進', 'ダッシュ', '電撃', '叫ぶ'];
+    const inLabels = ['Food Dir', 'Food Dist', 'Threat Dir', 'Threat Dist', 'Prey Dir', 'Prey Dist', 'Energy', 'Obstacle', 'Memory', 'Signal'];
+    const outLabels = ['Steer', 'Thrust', 'Sprint', 'Shock', 'Signal'];
 
     const colX = [startX + 36, startX + 115, startX + 180];
     const inYStep = 14;
@@ -1323,11 +1323,11 @@ function drawSpeciesPreview(catalogItem: SpeciesCatalogItem, isDiscovered: boole
     const animTime = world.totalTime * 3.5;
     ctx.font = 'bold 8px monospace';
     ctx.fillStyle = '#38bdf8';
-    ctx.fillText('[1.感覚]', colX[0] - 20, startY + 2);
+    ctx.fillText('[1.INPUT]', colX[0] - 20, startY + 2);
     ctx.fillStyle = '#a855f7';
-    ctx.fillText('[2.思考]', colX[1] - 12, startY + 2);
+    ctx.fillText('[2.HIDDEN]', colX[1] - 12, startY + 2);
     ctx.fillStyle = '#4ade80';
-    ctx.fillText('[3.行動]', colX[2] - 4, startY + 2);
+    ctx.fillText('[3.OUTPUT]', colX[2] - 4, startY + 2);
 
     ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
     ctx.fillRect(startX - 2, startY + 150, 245, 16);
@@ -1336,7 +1336,7 @@ function drawSpeciesPreview(catalogItem: SpeciesCatalogItem, isDiscovered: boole
     ctx.strokeRect(startX - 2, startY + 150, 245, 16);
     ctx.fillStyle = thoughtColor;
     ctx.font = 'bold 9px monospace';
-    ctx.fillText(`状態: ${thoughtText}`, startX + 6, startY + 162);
+    ctx.fillText(`State: ${thoughtText}`, startX + 6, startY + 162);
     for (let h = 0; h < brain.hiddenSize; h++) {
       const hy = startY + 18 + h * hidYStep;
       for (let i = 0; i < brain.inputSize; i++) {
@@ -1611,35 +1611,35 @@ function loop(time: number) {
         ctx.fillStyle = '#38bdf8';
         ctx.fillText('BIO-COSMOS', 8, 15);
         ctx.fillStyle = '#4ade80';
-        ctx.fillText(`草:${herbs}`, 80, 15);
+        ctx.fillText(`Herb:${herbs}`, 76, 15);
         ctx.fillStyle = '#34d399';
-        ctx.fillText(`海月:${jellies}`, 125, 15);
+        ctx.fillText(`Jelly:${jellies}`, 124, 15);
         ctx.fillStyle = '#f59e0b';
-        ctx.fillText(`蟹:${scavs}`, 175, 15);
+        ctx.fillText(`Scav:${scavs}`, 174, 15);
         ctx.fillStyle = '#f87171';
-        ctx.fillText(`肉:${carns}`, 220, 15);
+        ctx.fillText(`Carn:${carns}`, 222, 15);
 
         ctx.fillStyle = '#facc15';
-        ctx.fillText(`卵:${world.eggs.length}/稚:${larvaCount}`, 8, 30);
+        ctx.fillText(`Eggs:${world.eggs.length}/Larvae:${larvaCount}`, 8, 30);
         ctx.fillStyle = '#a855f7';
-        ctx.fillText(`世代:Gen.${world.maxGen}`, 115, 30);
+        ctx.fillText(`Gen.${world.maxGen}`, 128, 30);
         ctx.fillStyle = '#cbd5e1';
-        ctx.fillText(`速度:${world.timeScale.toFixed(1)}x`, viewW - 55, 30);
+        ctx.fillText(`${world.timeScale.toFixed(1)}x`, viewW - 35, 30);
       } else {
         ctx.fillStyle = '#38bdf8';
         ctx.fillText('BIO-COSMOS', 8, 17);
         ctx.fillStyle = '#4ade80';
-        ctx.fillText(`草:${herbs}`, 82, 17);
+        ctx.fillText(`Herb:${herbs}`, 78, 17);
         ctx.fillStyle = '#34d399';
-        ctx.fillText(`海月:${jellies}`, 128, 17);
+        ctx.fillText(`Jelly:${jellies}`, 124, 17);
         ctx.fillStyle = '#f59e0b';
-        ctx.fillText(`蟹:${scavs}`, 180, 17);
+        ctx.fillText(`Scav:${scavs}`, 174, 17);
         ctx.fillStyle = '#f87171';
-        ctx.fillText(`肉:${carns}`, 226, 17);
+        ctx.fillText(`Carn:${carns}`, 222, 17);
         ctx.fillStyle = '#facc15';
-        ctx.fillText(`卵:${world.eggs.length}/稚:${larvaCount}`, 272, 17);
+        ctx.fillText(`Eggs:${world.eggs.length}/Larvae:${larvaCount}`, 270, 17);
         ctx.fillStyle = '#a855f7';
-        ctx.fillText(`G.${world.maxGen}`, Math.min(viewW - 75, 380), 17);
+        ctx.fillText(`Gen.${world.maxGen}`, Math.min(viewW - 75, 410), 17);
         ctx.fillStyle = '#cbd5e1';
         ctx.fillText(`${world.timeScale.toFixed(1)}x`, viewW - 35, 17);
       }
@@ -1650,19 +1650,19 @@ function loop(time: number) {
 
       ctx.font = '11px "JetBrains Mono", monospace';
       ctx.fillStyle = '#4ade80';
-      ctx.fillText(`草食: ${herbs}`, 20, 44);
+      ctx.fillText(`Herbivores: ${herbs}`, 20, 44);
       ctx.fillStyle = '#34d399';
-      ctx.fillText(`クラゲ: ${jellies}`, 105, 44);
+      ctx.fillText(`Jellies: ${jellies}`, 130, 44);
       ctx.fillStyle = '#f59e0b';
-      ctx.fillText(`掃除屋: ${scavs}`, 200, 44);
+      ctx.fillText(`Scavengers: ${scavs}`, 220, 44);
       ctx.fillStyle = '#f87171';
-      ctx.fillText(`肉食: ${carns}`, 295, 44);
+      ctx.fillText(`Carnivores: ${carns}`, 330, 44);
       ctx.fillStyle = '#facc15';
-      ctx.fillText(`卵: ${world.eggs.length} / 稚魚: ${larvaCount}`, 385, 44);
+      ctx.fillText(`Eggs: ${world.eggs.length} / Larvae: ${larvaCount}`, 440, 44);
       ctx.fillStyle = '#a855f7';
-      ctx.fillText(`最高世代: Gen.${world.maxGen}`, 530, 44);
+      ctx.fillText(`Max Gen: ${world.maxGen}`, 600, 44);
       ctx.fillStyle = '#cbd5e1';
-      ctx.fillText(`速度: ${world.timeScale.toFixed(1)}x`, 670, 44);
+      ctx.fillText(`Speed: ${world.timeScale.toFixed(1)}x`, 710, 44);
     }
 
     if (selectedCreature && !selectedCreature.isDead) {
@@ -1678,19 +1678,19 @@ function loop(time: number) {
       ctx.lineWidth = 1.5;
       ctx.strokeRect(hudX, hudY, hudW, hudH);
 
-      const typeIcon = sc.type === 'solar_jelly' ? '[クラゲ]' : sc.type === 'scavenger' ? '[掃除屋]' : sc.type === 'chimera' ? '[頂点怪獣]' : sc.dna.diet > 0.5 ? '[深海サメ]' : '[草食生物]';
-      const stageStr = sc.stage === 'larva' ? `稚魚(${(sc.growth * 100).toFixed(0)}%)` : '成体';
+      const typeIcon = sc.type === 'solar_jelly' ? '[JELLY]' : sc.type === 'scavenger' ? '[SCAVENGER]' : sc.type === 'chimera' ? '[APEX]' : sc.dna.diet > 0.5 ? '[CARNIVORE]' : '[HERBIVORE]';
+      const stageStr = sc.stage === 'larva' ? `Larva (${(sc.growth * 100).toFixed(0)}%)` : 'Adult';
 
       ctx.fillStyle = sc.dna.diet > 0.5 ? '#f87171' : '#38bdf8';
       ctx.font = isMobile ? 'bold 10px monospace' : 'bold 13px monospace';
       ctx.fillText(`${typeIcon} #${sc.id} (Gen.${sc.generation}) [${stageStr}]`, hudX + 8, hudY + (isMobile ? 12 : 20));
 
       if (!isMobile) {
-        const rkStr = sc.dna.rkStrategy > 0.55 ? 'K-戦略 (大卵少産)' : 'r-戦略 (多産小卵)';
+        const rkStr = sc.dna.rkStrategy > 0.55 ? 'K-Strategy (Fewer/Larger)' : 'r-Strategy (Many/Smaller)';
         ctx.fillStyle = '#cbd5e1';
         ctx.font = '11px monospace';
-        ctx.fillText(`形態: [${stageStr}] | 戦略: [${rkStr}]`, hudX + 12, hudY + 38);
-        ctx.fillText(`寿命: ${sc.age.toFixed(1)} / ${sc.dna.maxAge.toFixed(1)}s | 討伐: ${sc.kills} | 子孫: ${sc.children}`, hudX + 12, hudY + 56);
+        ctx.fillText(`Stage: [${stageStr}] | Strat: [${rkStr}]`, hudX + 12, hudY + 38);
+        ctx.fillText(`Age: ${sc.age.toFixed(1)}/${sc.dna.maxAge.toFixed(1)}s | Kills: ${sc.kills} | Offspring: ${sc.children}`, hudX + 12, hudY + 56);
       }
 
       const barY = isMobile ? hudY + 18 : hudY + 66;
@@ -1705,23 +1705,23 @@ function loop(time: number) {
       } else {
         ctx.fillStyle = '#a855f7';
         ctx.font = 'bold 11px monospace';
-        ctx.fillText('NEURAL BRAIN // 神経網発火モニター', hudX + 12, hudY + 92);
+        ctx.fillText('NEURAL BRAIN // ACTIVATION MONITOR', hudX + 12, hudY + 92);
         drawBrainMonitor(sc.brain, hudX + 45, hudY + 95, false);
       }
 
       if (autoCinematic && !isMobile) {
         ctx.fillStyle = '#f59e0b';
         ctx.font = '10px monospace';
-        ctx.fillText('オートシネマティック追従中 (操作で解除)', hudX + 12, hudY + hudH - 12);
+        ctx.fillText('Cinematic Tracking (Interact to cancel)', hudX + 12, hudY + hudH - 12);
       }
     }
 
     const toolLabels: Record<GodTool, string> = {
-      inspect: '1. 観察',
-      feed_all: '2. 万能餌',
-      meteor: '3. 隕石',
-      spawn_larva: '4. 稚魚',
-      spawn_apex: '5. 頂点怪獣'
+      inspect: '1. Inspect',
+      feed_all: '2. Feed All',
+      meteor: '3. Meteor',
+      spawn_larva: '4. Spawn Larva',
+      spawn_apex: '5. Spawn Apex'
     };
 
     const tabW = isMobile ? 130 : 160;
@@ -1742,14 +1742,14 @@ function loop(time: number) {
 
     if (isToolMenuOpen) {
       const menuItems = [
-        { id: 'inspect', label: '1. 観察' },
-        { id: 'feed_all', label: '2. 万能餌' },
-        { id: 'meteor', label: '3. 隕石' },
-        { id: 'spawn_larva', label: '4. 稚魚' },
-        { id: 'spawn_apex', label: '5. 頂点怪獣' },
-        { id: 'dna_bank', label: '6. 水槽セーブ' },
-        { id: 'catalog', label: '7. バイオ図鑑' },
-        { id: 'reset', label: '8. リセット' }
+        { id: 'inspect', label: '1. Inspect' },
+        { id: 'feed_all', label: '2. Feed All' },
+        { id: 'meteor', label: '3. Meteor' },
+        { id: 'spawn_larva', label: '4. Spawn Larva' },
+        { id: 'spawn_apex', label: '5. Spawn Apex' },
+        { id: 'dna_bank', label: '6. Save Slots' },
+        { id: 'catalog', label: '7. Species Catalog' },
+        { id: 'reset', label: '8. Reset World' }
       ];
 
       const menuW = isMobile ? 150 : 190;
@@ -1809,9 +1809,9 @@ function loop(time: number) {
       ctx.fillStyle = '#facc15';
       ctx.font = 'bold 8px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('変異種検知', lx, ly - lr - 3);
+      ctx.fillText('MUTANT DETECTED', lx, ly - lr - 3);
       ctx.fillStyle = '#38bdf8';
-      ctx.fillText('TAP TO JUMP', lx, ly + lr + 10);
+      ctx.fillText('TAP TO VIEW', lx, ly + lr + 10);
       ctx.textAlign = 'left';
     }
 
@@ -1827,7 +1827,7 @@ function loop(time: number) {
       ctx.fillStyle = '#facc15';
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`新種発見: [${world.recentDiscovery}] 登録!`, viewW / 2, 53);
+      ctx.fillText(`DISCOVERY: [${world.recentDiscovery}] REGISTERED!`, viewW / 2, 53);
       ctx.textAlign = 'left';
     }
 
@@ -1857,7 +1857,7 @@ function loop(time: number) {
 
       ctx.fillStyle = '#f8fafc';
       ctx.font = 'bold 11px monospace';
-      ctx.fillText('SAVE SLOTS // 水槽セーブスロット管理', bX + 12, bY + 18);
+      ctx.fillText('SAVE SLOTS // WORLD SAVE MANAGER', bX + 12, bY + 18);
 
       for (let s = 1; s <= 3; s++) {
         const sy = bY + 28 + (s - 1) * (isMobile ? 42 : 48);
@@ -1871,21 +1871,21 @@ function loop(time: number) {
 
         ctx.fillStyle = '#38bdf8';
         ctx.font = 'bold 10px monospace';
-        ctx.fillText(`スロット ${s}`, bX + 14, sy + 14);
+        ctx.fillText(`Slot ${s}`, bX + 14, sy + 14);
 
-        ctx.fillStyle = summary === '空スロット' ? '#64748b' : '#94a3b8';
+        ctx.fillStyle = summary === 'Empty Slot' ? '#64748b' : '#94a3b8';
         ctx.font = '9px monospace';
         ctx.fillText(summary, bX + 14, sy + 28);
         ctx.fillStyle = '#065f46';
         ctx.fillRect(bX + bW - 100, sy + 6, 40, 22);
         ctx.fillStyle = '#34d399';
         ctx.font = '9px monospace';
-        ctx.fillText('保存', bX + bW - 90, sy + 20);
+        ctx.fillText('Save', bX + bW - 92, sy + 20);
 
-        ctx.fillStyle = summary === '空スロット' ? '#1e293b' : '#1e3a8a';
+        ctx.fillStyle = summary === 'Empty Slot' ? '#1e293b' : '#1e3a8a';
         ctx.fillRect(bX + bW - 52, sy + 6, 40, 22);
-        ctx.fillStyle = summary === '空スロット' ? '#475569' : '#60a5fa';
-        ctx.fillText('読込', bX + bW - 42, sy + 20);
+        ctx.fillStyle = summary === 'Empty Slot' ? '#475569' : '#60a5fa';
+        ctx.fillText('Load', bX + bW - 44, sy + 20);
       }
 
       const botY = bY + bH - 26;
@@ -1893,7 +1893,7 @@ function loop(time: number) {
       ctx.fillRect(bX + bW - 70, botY, 58, 18);
       ctx.fillStyle = '#fff';
       ctx.font = '9px monospace';
-      ctx.fillText('閉じる', bX + bW - 58, botY + 13);
+      ctx.fillText('Close', bX + bW - 55, botY + 13);
     }
 
     if (isCatalogOpen) {
@@ -1910,7 +1910,7 @@ function loop(time: number) {
       const count = world.discoveredSpecies.length;
       ctx.fillStyle = '#facc15';
       ctx.font = 'bold 11px monospace';
-      ctx.fillText(`SPECIES CATALOG // バイオ変異図鑑 (${count}/${SPECIES_CATALOG.length})`, cX + 12, cY + 18);
+      ctx.fillText(`SPECIES CATALOG // MUTATION ARCHIVE (${count}/${SPECIES_CATALOG.length})`, cX + 12, cY + 18);
 
       const listX = cX + 10;
       const listY = cY + 28;
@@ -1941,12 +1941,12 @@ function loop(time: number) {
 
         ctx.font = isMobile ? '8px monospace' : '10px monospace';
         ctx.fillStyle = isSelected ? '#38bdf8' : isDiscovered ? '#f8fafc' : '#64748b';
-        const displayName = isDiscovered ? item.name : '??? 未確認';
+        const displayName = isDiscovered ? item.name : '??? Unknown';
         ctx.fillText(displayName, ix + 3, iy + (isMobile ? 12 : 18));
 
         ctx.font = '7px monospace';
         ctx.fillStyle = isDiscovered ? '#94a3b8' : '#475569';
-        ctx.fillText(isDiscovered ? item.category : '未発見', ix + 3, iy + (isMobile ? 24 : 36));
+        ctx.fillText(isDiscovered ? item.category : 'Undiscovered', ix + 3, iy + (isMobile ? 24 : 36));
       });
 
       const rightX = listX + 3 * (itemW + gapX) + (isMobile ? 6 : 14);
@@ -1965,7 +1965,7 @@ function loop(time: number) {
 
       ctx.font = '8px monospace';
       ctx.fillStyle = isCurDiscovered ? '#34d399' : '#f43f5e';
-      ctx.fillText(isCurDiscovered ? '[ 観測個体 ]' : '[ 未確認 ]', rightX + 6, listY + 12);
+      ctx.fillText(isCurDiscovered ? '[ OBSERVED ]' : '[ UNKNOWN ]', rightX + 6, listY + 12);
 
       const descY = listY + prevH + (isMobile ? 4 : 12);
       ctx.font = isMobile ? 'bold 9px monospace' : 'bold 12px monospace';
@@ -1974,7 +1974,7 @@ function loop(time: number) {
 
       ctx.font = '8px monospace';
       ctx.fillStyle = '#38bdf8';
-      ctx.fillText(`条件: ${curItem.condition}`, rightX, descY + (isMobile ? 20 : 30));
+      ctx.fillText(`Req: ${curItem.condition}`, rightX, descY + (isMobile ? 20 : 30));
 
       const btnW = isMobile ? 50 : 65;
       const btnH = isMobile ? 18 : 24;
@@ -1987,7 +1987,7 @@ function loop(time: number) {
       ctx.strokeRect(btnX, btnY, btnW, btnH);
       ctx.fillStyle = '#fff';
       ctx.font = isMobile ? '9px monospace' : '11px monospace';
-      ctx.fillText('閉じる', btnX + (isMobile ? 8 : 14), btnY + (isMobile ? 12 : 16));
+      ctx.fillText('Close', btnX + (isMobile ? 8 : 14), btnY + (isMobile ? 12 : 16));
     }
 
     if (isResetConfirming) {
@@ -2004,7 +2004,7 @@ function loop(time: number) {
           ctx.fillStyle = '#f8fafc';
           ctx.font = 'bold 11px "JetBrains Mono", monospace';
           ctx.textAlign = 'center';
-          ctx.fillText('本当にリセットしますか？', viewW / 2, dY + 28);
+          ctx.fillText('Reset the ecosystem?', viewW / 2, dY + 28);
 
           ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
           ctx.fillRect(dX + 20, dY + 52, 95, 32);
@@ -2012,7 +2012,7 @@ function loop(time: number) {
           ctx.lineWidth = 1;
           ctx.strokeRect(dX + 20, dY + 52, 95, 32);
           ctx.fillStyle = '#ffffff';
-          ctx.fillText('はい', dX + 67, dY + 72);
+          ctx.fillText('Yes', dX + 67, dY + 72);
 
           ctx.fillStyle = 'rgba(51, 65, 85, 0.85)';
           ctx.fillRect(dX + 145, dY + 52, 95, 32);
@@ -2020,7 +2020,7 @@ function loop(time: number) {
           ctx.lineWidth = 1;
           ctx.strokeRect(dX + 145, dY + 52, 95, 32);
           ctx.fillStyle = '#ffffff';
-          ctx.fillText('いいえ', dX + 192, dY + 72);
+          ctx.fillText('No', dX + 192, dY + 72);
 
           ctx.textAlign = 'left';
         }
