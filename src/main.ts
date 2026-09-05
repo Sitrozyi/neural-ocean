@@ -439,73 +439,75 @@ canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
       return;
     }
-    if (isDnaBankOpen || isCatalogOpen) {
-      const bW = isCompact ? 320 : 360, bH = isCompact ? 220 : 270;
-      const bX = (viewW - bW) / 2, bY = (viewH - bH) / 2;
-      const botY = bY + bH - 32;
-
-      if (isDnaBankOpen) {
-        const dW = isCompact ? 300 : 360, dH = isCompact ? 190 : 230;
-        const dX = (viewW - dW) / 2, dY = (viewH - dH) / 2;
-        for (let s = 1; s <= 3; s++) {
-          const sy = dY + 32 + (s - 1) * (isCompact ? 42 : 48);
-          if (mx >= dX + dW - 105 && mx <= dX + dW - 63 && my >= sy + 4 && my <= sy + 30) {
-            world.saveWorldState(s);
-            systemMessage = `スロット ${s} 保存完了`;
-            systemMessageTimer = 2.0;
-            e.preventDefault(); return;
-          }
-          if (mx >= dX + dW - 55 && mx <= dX + dW - 13 && my >= sy + 4 && my <= sy + 30) {
-            if (world.loadWorldState(s)) {
-              systemMessage = `スロット ${s} 読込完了`;
-              selectedCreature = null;
-            } else {
-              systemMessage = `スロット ${s} 空`;
-            }
-            systemMessageTimer = 2.0;
-            e.preventDefault(); return;
-          }
+    if (isDnaBankOpen) {
+      const dW = isCompact ? 300 : 360, dH = isCompact ? 190 : 230;
+      const dX = (viewW - dW) / 2, dY = (viewH - dH) / 2;
+      for (let s = 1; s <= 3; s++) {
+        const sy = dY + 28 + (s - 1) * (isCompact ? 42 : 48);
+        if (mx >= dX + dW - 105 && mx <= dX + dW - 63 && my >= sy + 4 && my <= sy + 30) {
+          world.saveWorldState(s);
+          systemMessage = `スロット ${s} 保存完了`;
+          systemMessageTimer = 2.0;
+          e.preventDefault(); return;
         }
-        if (mx >= dX + dW - 75 && mx <= dX + dW - 15 && my >= dY + dH - 28 && my <= dY + dH - 6) {
-          isDnaBankOpen = false;
+        if (mx >= dX + dW - 55 && mx <= dX + dW - 13 && my >= sy + 4 && my <= sy + 30) {
+          if (world.loadWorldState(s)) {
+            systemMessage = `スロット ${s} 読込完了`;
+            selectedCreature = null;
+          } else {
+            systemMessage = `スロット ${s} 空`;
+          }
+          systemMessageTimer = 2.0;
           e.preventDefault(); return;
         }
       }
-      if (mx >= bX + bW - 80 && mx <= bX + bW - 15 && my >= botY && my <= botY + 24) {
+      const botY = dY + dH - 26;
+      if (mx >= dX + dW - 76 && mx <= dX + dW - 6 && my >= botY - 6 && my <= botY + 24) {
         isDnaBankOpen = false;
+        e.preventDefault(); return;
+      }
+      e.preventDefault();
+      return;
+    }
+
+    if (isCatalogOpen) {
+      const cW = isCompact ? Math.min(viewW - 16, 520) : 660;
+      const cH = isCompact ? Math.min(viewH - 16, 280) : 400;
+      const cX = (viewW - cW) / 2, cY = (viewH - cH) / 2;
+      const btnW = isCompact ? 50 : 65;
+      const btnH = isCompact ? 18 : 24;
+      const btnX = cX + cW - btnW - 10;
+      const btnY = cY + cH - btnH - 8;
+
+      if (mx >= btnX - 6 && mx <= btnX + btnW + 6 && my >= btnY - 6 && my <= btnY + btnH + 6) {
         isCatalogOpen = false;
         e.preventDefault();
         return;
       }
 
-      if (isCatalogOpen) {
-        const cW = isCompact ? Math.min(viewW - 16, 520) : 660;
-        const cH = isCompact ? Math.min(viewH - 16, 280) : 400;
-        const cX = (viewW - cW) / 2, cY = (viewH - cH) / 2;
-        const listX = cX + 10;
-        const listY = cY + 32;
-        const cols = 3;
-        const itemW = isCompact ? 64 : 104;
-        const itemH = isCompact ? 32 : 48;
-        const gapX = isCompact ? 4 : 6;
-        const gapY = isCompact ? 4 : 6;
+      const listX = cX + 10;
+      const listY = cY + 28;
+      const cols = 3;
+      const itemW = isCompact ? 64 : 104;
+      const itemH = isCompact ? 32 : 48;
+      const gapX = isCompact ? 4 : 6;
+      const gapY = isCompact ? 4 : 6;
 
-        for (let idx = 0; idx < SPECIES_CATALOG.length; idx++) {
-          const c = idx % cols;
-          const r = Math.floor(idx / cols);
-          const ix = listX + c * (itemW + gapX);
-          const iy = listY + r * (itemH + gapY);
-          if (mx >= ix && mx <= ix + itemW && my >= iy && my <= iy + itemH) {
-            selectedCatalogId = SPECIES_CATALOG[idx].id;
-            e.preventDefault();
-            return;
-          }
+      for (let idx = 0; idx < SPECIES_CATALOG.length; idx++) {
+        const c = idx % cols;
+        const r = Math.floor(idx / cols);
+        const ix = listX + c * (itemW + gapX);
+        const iy = listY + r * (itemH + gapY);
+        if (mx >= ix && mx <= ix + itemW && my >= iy && my <= iy + itemH) {
+          selectedCatalogId = SPECIES_CATALOG[idx].id;
+          e.preventDefault();
+          return;
         }
       }
-
       e.preventDefault();
       return;
     }
+
     if (isToolMenuOpen) {
       const menuW = isCompact ? 150 : 190;
       const itemH = isCompact ? 22 : 30;
@@ -528,6 +530,10 @@ canvas.addEventListener('touchstart', (e) => {
       } else {
         isToolMenuOpen = false;
       }
+    }
+
+    if (selectedCreature) {
+      selectedCreature = null;
     }
 
     isTouchPanning = true;
