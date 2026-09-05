@@ -192,6 +192,7 @@ function applyGodPower(wx: number, wy: number) {
     world.spawnCreature(type, wx, wy, 1, undefined, undefined, 'larva');
   } else if (currentTool === 'spawn_apex') {
     world.spawnCreature('chimera', wx, wy, 1, undefined, undefined, 'adult');
+    world.addShockwave(wx, wy, 180, 'rgba(56, 189, 248, 0.85)');
   }
 }
 
@@ -749,6 +750,263 @@ function drawScavenger(c: Creature, isSilhouette = false) {
 
   ctx.restore();
 }
+
+function drawLeviathan(c: Creature, isSilhouette = false) {
+  ctx.save();
+  const currentSize = c.dna.size * (0.35 + 0.65 * c.growth);
+  const [r, g, b] = c.dna.color;
+
+  if (!isSilhouette) {
+    ctx.save();
+    const glowGrad = ctx.createRadialGradient(c.x, c.y, currentSize * 0.5, c.x, c.y, currentSize * 3.6);
+    glowGrad.addColorStop(0, 'rgba(6, 182, 212, 0.22)');
+    glowGrad.addColorStop(0.5, 'rgba(14, 116, 144, 0.1)');
+    glowGrad.addColorStop(1, 'rgba(2, 6, 23, 0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, currentSize * 3.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  if (c.tailNodes.length > 1) {
+    for (let i = c.tailNodes.length - 1; i >= 1; i--) {
+      const node = c.tailNodes[i];
+      const prev = c.tailNodes[i - 1];
+      const t = i / c.tailNodes.length;
+      const nodeSize = currentSize * (1.35 - t * 0.78);
+      const segAngle = Math.atan2(node.y - prev.y, node.x - prev.x);
+      const wave = Math.sin(c.finPhase + i * 0.75) * (currentSize * 0.4 * (1 - t));
+
+      ctx.save();
+      ctx.translate(node.x, node.y);
+      ctx.rotate(segAngle);
+
+      if (i === c.tailNodes.length - 1) {
+        ctx.fillStyle = isSilhouette ? '#0f172a' : 'rgba(6, 182, 212, 0.85)';
+        ctx.strokeStyle = isSilhouette ? '#334155' : '#38bdf8';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(-nodeSize * 2.8, -nodeSize * 3.8 + wave, -nodeSize * 4.8, -nodeSize * 2.0 + wave, -nodeSize * 6.0, wave);
+        ctx.bezierCurveTo(-nodeSize * 4.8, nodeSize * 2.0 + wave, -nodeSize * 2.8, nodeSize * 3.8 + wave, 0, 0);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = isSilhouette ? '#0f172a' : '#082f49';
+        ctx.beginPath();
+        ctx.moveTo(0, -nodeSize * 0.45);
+        ctx.lineTo(-nodeSize * 6.5, wave);
+        ctx.lineTo(0, nodeSize * 0.45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      for (let s = -1; s <= 1; s += 2) {
+        ctx.fillStyle = isSilhouette ? '#0f172a' : 'rgba(14, 116, 144, 0.75)';
+        ctx.strokeStyle = isSilhouette ? '#334155' : '#06b6d4';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(-nodeSize * 0.2, s * nodeSize * 0.6);
+        ctx.lineTo(-nodeSize * 1.8, s * nodeSize * (1.6 + (1 - t) * 0.9));
+        ctx.lineTo(nodeSize * 0.4, s * nodeSize * 0.4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      if (i % 2 === 1) {
+        ctx.fillStyle = isSilhouette ? '#0f172a' : '#0284c7';
+        ctx.strokeStyle = isSilhouette ? '#334155' : '#67e8f9';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(nodeSize * 0.2, -nodeSize * 0.5);
+        ctx.lineTo(-nodeSize * 1.3, -nodeSize * (2.6 + (1 - t) * 1.5));
+        ctx.lineTo(-nodeSize * 0.7, -nodeSize * 0.3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = isSilhouette ? '#0f172a' : `rgb(${Math.max(5, r - i * 3)}, ${Math.max(15, g - i * 5)}, ${Math.max(35, b - i * 7)})`;
+      ctx.strokeStyle = isSilhouette ? '#334155' : '#38bdf8';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(nodeSize * 1.15, 0);
+      ctx.lineTo(0, -nodeSize * 0.95);
+      ctx.lineTo(-nodeSize * 1.25, 0);
+      ctx.lineTo(0, nodeSize * 0.95);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      if (!isSilhouette) {
+        ctx.fillStyle = '#67e8f9';
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.max(1.6, nodeSize * 0.24), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+  }
+
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.rotate(c.angle);
+
+  const finFlap = Math.sin(c.finPhase * 0.9) * 0.25;
+  for (let side = -1; side <= 1; side += 2) {
+    ctx.save();
+    ctx.translate(-currentSize * 0.1, side * currentSize * 0.85);
+    ctx.rotate(side * (0.65 + finFlap));
+
+    ctx.fillStyle = isSilhouette ? '#0f172a' : 'rgba(14, 116, 144, 0.85)';
+    ctx.strokeStyle = isSilhouette ? '#334155' : '#38bdf8';
+    ctx.lineWidth = 2.0;
+
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(currentSize * 2.8, side * currentSize * 3.0);
+    ctx.lineTo(currentSize * 1.3, side * currentSize * 2.3);
+    ctx.lineTo(currentSize * 0.8, side * currentSize * 1.6);
+    ctx.lineTo(-currentSize * 0.2, side * currentSize * 0.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    if (!isSilhouette) {
+      ctx.strokeStyle = '#67e8f9';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(currentSize * 2.0, side * currentSize * 2.2);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(currentSize * 1.1, side * currentSize * 1.5);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  for (let s = -1; s <= 1; s += 2) {
+    ctx.fillStyle = isSilhouette ? '#0f172a' : '#0369a1';
+    ctx.strokeStyle = isSilhouette ? '#334155' : '#67e8f9';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(currentSize * 0.3, s * currentSize * 0.6);
+    ctx.quadraticCurveTo(currentSize * 1.6, s * currentSize * 2.4, currentSize * 3.2, s * currentSize * 1.9);
+    ctx.lineTo(currentSize * 1.2, s * currentSize * 0.7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = isSilhouette ? '#0f172a' : '#0284c7';
+    ctx.beginPath();
+    ctx.moveTo(-currentSize * 0.2, s * currentSize * 0.5);
+    ctx.quadraticCurveTo(currentSize * 0.8, s * currentSize * 1.7, currentSize * 1.9, s * currentSize * 1.4);
+    ctx.lineTo(currentSize * 0.4, s * currentSize * 0.4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = isSilhouette ? '#0f172a' : '#082f49';
+  ctx.strokeStyle = isSilhouette ? '#334155' : '#38bdf8';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(currentSize * 2.8, 0);
+  ctx.lineTo(currentSize * 1.5, -currentSize * 1.25);
+  ctx.lineTo(-currentSize * 0.9, -currentSize * 1.35);
+  ctx.lineTo(-currentSize * 1.9, -currentSize * 0.8);
+  ctx.lineTo(-currentSize * 2.1, 0);
+  ctx.lineTo(-currentSize * 1.9, currentSize * 0.8);
+  ctx.lineTo(-currentSize * 0.9, currentSize * 1.35);
+  ctx.lineTo(currentSize * 1.5, currentSize * 1.25);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  if (!isSilhouette) {
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#0284c7';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(currentSize * 1.9, 0);
+    ctx.lineTo(currentSize * 0.6, -currentSize * 0.75);
+    ctx.lineTo(-currentSize * 0.6, 0);
+    ctx.lineTo(currentSize * 0.6, currentSize * 0.75);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    const waveW = Math.sin(c.finPhase * 1.2) * (currentSize * 0.35);
+    for (let s = -1; s <= 1; s += 2) {
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(currentSize * 2.2, s * currentSize * 0.4);
+      ctx.bezierCurveTo(
+        currentSize * 0.6, s * currentSize * 2.0 + waveW,
+        -currentSize * 1.0, s * currentSize * 2.4 - waveW,
+        -currentSize * 3.0, s * currentSize * 2.2 + waveW
+      );
+      ctx.stroke();
+    }
+
+    for (let s = -1; s <= 1; s += 2) {
+      ctx.save();
+      ctx.translate(currentSize * 1.2, s * currentSize * 0.68);
+      ctx.rotate(s * 0.2);
+
+      ctx.fillStyle = '#67e8f9';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, currentSize * 0.48, currentSize * 0.25, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#082f49';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, currentSize * 0.13, currentSize * 0.23, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(currentSize * 0.09, -currentSize * 0.06, currentSize * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.0;
+    const fangCount = 6;
+    for (let f = 0; f < fangCount; f++) {
+      const fx = currentSize * (1.35 + f * 0.23);
+      const fyTop = -currentSize * (0.46 - f * 0.06);
+      const fyBot = currentSize * (0.46 - f * 0.06);
+      const fLen = currentSize * (0.55 + Math.sin(f * 0.8) * 0.28);
+
+      ctx.beginPath();
+      ctx.moveTo(fx - currentSize * 0.08, fyTop);
+      ctx.lineTo(fx, fyTop + fLen);
+      ctx.lineTo(fx + currentSize * 0.08, fyTop);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(fx - currentSize * 0.08, fyBot);
+      ctx.lineTo(fx, fyBot - fLen);
+      ctx.lineTo(fx + currentSize * 0.08, fyBot);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+  ctx.restore();
+}
 function drawFishCreature(c: Creature, isSilhouette = false) {
   ctx.save();
   const [r, g, b] = c.dna.color;
@@ -813,15 +1071,16 @@ function drawFishCreature(c: Creature, isSilhouette = false) {
       ctx.fill();
       if (isSilhouette) ctx.stroke();
       if ((isCarnivore || isApex || c.dna.segments >= 6) && !isLarva && i % 2 === 1) {
-        ctx.fillStyle = isSilhouette ? '#0f172a' : (isApex ? '#a855f7' : isCarnivore ? '#ef4444' : '#0d9488');
-        ctx.strokeStyle = isSilhouette ? '#334155' : 'transparent';
+        ctx.fillStyle = isSilhouette ? '#0f172a' : (isApex ? '#06b6d4' : isCarnivore ? '#ef4444' : '#0d9488');
+        ctx.strokeStyle = isSilhouette ? '#334155' : (isApex ? '#67e8f9' : 'transparent');
+        ctx.lineWidth = isApex ? 1.5 : 1;
         ctx.beginPath();
         ctx.moveTo(0, -nodeSize * 0.8);
-        ctx.lineTo(-nodeSize * 0.6, -nodeSize * (1.6 + (1 - t) * 0.8));
+        ctx.lineTo(-nodeSize * (isApex ? 1.0 : 0.6), -nodeSize * (isApex ? 2.4 + (1 - t) * 1.2 : 1.6 + (1 - t) * 0.8));
         ctx.lineTo(-nodeSize * 0.8, -nodeSize * 0.6);
         ctx.closePath();
         ctx.fill();
-        if (isSilhouette) ctx.stroke();
+        if (isApex || isSilhouette) ctx.stroke();
       }
 
       ctx.restore();
@@ -840,10 +1099,22 @@ function drawFishCreature(c: Creature, isSilhouette = false) {
       ctx.arc(c.x, c.y, currentSize * 2.2, 0, Math.PI * 2);
       ctx.stroke();
     } else if (isCarnivore) {
-      ctx.fillStyle = isApex ? 'rgba(192, 38, 211, 0.15)' : 'rgba(239, 68, 68, 0.13)';
-      ctx.beginPath();
-      ctx.arc(c.x, c.y, currentSize * 2.8, 0, Math.PI * 2);
-      ctx.fill();
+      if (isApex) {
+        ctx.fillStyle = 'rgba(14, 165, 233, 0.16)';
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, currentSize * 3.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, currentSize * 2.4, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.13)';
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, currentSize * 2.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
   if (c.dna.isCrystal && !isSilhouette) {
@@ -879,6 +1150,20 @@ function drawFishCreature(c: Creature, isSilhouette = false) {
     }
   }
   if (!isLarva && !isSilhouette) {
+    if (parts.includes('head_horn') || isApex) {
+      ctx.fillStyle = isApex ? '#0284c7' : '#e2e8f0';
+      ctx.strokeStyle = isApex ? '#67e8f9' : '#94a3b8';
+      ctx.lineWidth = 1.5;
+      for (let s = -1; s <= 1; s += 2) {
+        ctx.beginPath();
+        ctx.moveTo(currentSize * 0.6, s * currentSize * 0.5);
+        ctx.quadraticCurveTo(currentSize * 1.8, s * currentSize * 1.6, currentSize * 2.5, s * currentSize * 1.3);
+        ctx.lineTo(currentSize * 1.0, s * currentSize * 0.4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
     if (parts.includes('head_beak')) {
       ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
@@ -909,13 +1194,13 @@ function drawFishCreature(c: Creature, isSilhouette = false) {
       ctx.rotate(side * (0.55 + finFlap));
 
       if (isApex) {
-        ctx.fillStyle = isSilhouette ? '#0f172a' : 'rgba(168, 85, 247, 0.85)';
-        ctx.strokeStyle = isSilhouette ? '#334155' : '#f472b6';
-        ctx.lineWidth = 1.5;
+        ctx.fillStyle = isSilhouette ? '#0f172a' : 'rgba(14, 116, 144, 0.85)';
+        ctx.strokeStyle = isSilhouette ? '#334155' : '#38bdf8';
+        ctx.lineWidth = 1.8;
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.lineTo(currentSize * 1.6, side * currentSize * 1.8);
-        ctx.lineTo(currentSize * 0.4, side * currentSize * 0.6);
+        ctx.lineTo(currentSize * 2.0, side * currentSize * 2.2);
+        ctx.lineTo(currentSize * 0.3, side * currentSize * 0.7);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
@@ -953,16 +1238,16 @@ function drawFishCreature(c: Creature, isSilhouette = false) {
     ctx.stroke();
   }
   if (isApex && !isLarva) {
-    ctx.fillStyle = isSilhouette ? '#0f172a' : '#3b0764';
-    ctx.strokeStyle = isSilhouette ? '#334155' : '#d8b4fe';
-    ctx.lineWidth = 2.0;
+    ctx.fillStyle = isSilhouette ? '#0f172a' : '#082f49';
+    ctx.strokeStyle = isSilhouette ? '#334155' : '#38bdf8';
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.moveTo(currentSize * 1.8, 0);
-    ctx.lineTo(currentSize * 0.6, -currentSize * 1.25);
-    ctx.lineTo(-currentSize * 1.2, -currentSize * 1.0);
-    ctx.lineTo(-currentSize * 1.5, 0);
-    ctx.lineTo(-currentSize * 1.2, currentSize * 1.0);
-    ctx.lineTo(currentSize * 0.6, currentSize * 1.25);
+    ctx.moveTo(currentSize * 2.2, 0);
+    ctx.lineTo(currentSize * 0.8, -currentSize * 1.35);
+    ctx.lineTo(-currentSize * 1.3, -currentSize * 1.1);
+    ctx.lineTo(-currentSize * 1.7, 0);
+    ctx.lineTo(-currentSize * 1.3, currentSize * 1.1);
+    ctx.lineTo(currentSize * 0.8, currentSize * 1.35);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
@@ -1041,14 +1326,14 @@ function drawFishCreature(c: Creature, isSilhouette = false) {
         ctx.translate(eyeX, side * eyeOffset);
         ctx.rotate(side * 0.25);
 
-        ctx.fillStyle = isApex ? '#fef08a' : '#fee2e2';
+        ctx.fillStyle = isApex ? '#38bdf8' : '#fee2e2';
         ctx.beginPath();
-        ctx.ellipse(0, 0, currentSize * 0.35, currentSize * 0.2, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, currentSize * 0.38, currentSize * 0.22, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = isApex ? '#7e22ce' : '#dc2626';
+        ctx.fillStyle = isApex ? '#0369a1' : '#dc2626';
         ctx.beginPath();
-        ctx.ellipse(currentSize * 0.05, 0, currentSize * 0.14, currentSize * 0.18, 0, 0, Math.PI * 2);
+        ctx.ellipse(currentSize * 0.05, 0, currentSize * 0.16, currentSize * 0.2, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
@@ -1070,8 +1355,8 @@ function drawFishCreature(c: Creature, isSilhouette = false) {
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#f87171';
       ctx.lineWidth = 0.8;
-      const fangLength = currentSize * (0.55 + c.dna.biteForce * 0.4);
-      const fangCount = isApex ? 4 : 3;
+      const fangLength = currentSize * (0.65 + c.dna.biteForce * 0.45);
+      const fangCount = isApex ? 5 : 3;
 
       for (let f = 0; f < fangCount; f++) {
         const fx = currentSize * (1.1 + f * 0.22);
@@ -1171,6 +1456,8 @@ function drawSpeciesPreview(catalogItem: SpeciesCatalogItem, isDiscovered: boole
       drawSolarJelly(dummyCreature, !isDiscovered);
     } else if (dummyCreature.type === 'scavenger') {
       drawScavenger(dummyCreature, !isDiscovered);
+    } else if (dummyCreature.type === 'chimera') {
+      drawLeviathan(dummyCreature, !isDiscovered);
     } else {
       drawFishCreature(dummyCreature, !isDiscovered);
     }
@@ -1198,6 +1485,8 @@ function drawSpeciesPreview(catalogItem: SpeciesCatalogItem, isDiscovered: boole
       drawSolarJelly(c);
     } else if (c.type === 'scavenger') {
       drawScavenger(c);
+    } else if (c.type === 'chimera') {
+      drawLeviathan(c);
     } else {
       drawFishCreature(c);
     }
@@ -1609,15 +1898,15 @@ function loop(time: number) {
       ctx.font = '9px "JetBrains Mono", monospace';
       if (isPortrait) {
         ctx.fillStyle = '#38bdf8';
-        ctx.fillText('BIO-COSMOS', 8, 15);
+        ctx.fillText('NEURAL-OCEAN', 8, 15);
         ctx.fillStyle = '#4ade80';
-        ctx.fillText(`Herb:${herbs}`, 76, 15);
+        ctx.fillText(`Herb:${herbs}`, 82, 15);
         ctx.fillStyle = '#34d399';
-        ctx.fillText(`Jelly:${jellies}`, 124, 15);
+        ctx.fillText(`Jelly:${jellies}`, 128, 15);
         ctx.fillStyle = '#f59e0b';
-        ctx.fillText(`Scav:${scavs}`, 174, 15);
+        ctx.fillText(`Scav:${scavs}`, 178, 15);
         ctx.fillStyle = '#f87171';
-        ctx.fillText(`Carn:${carns}`, 222, 15);
+        ctx.fillText(`Carn:${carns}`, 226, 15);
 
         ctx.fillStyle = '#facc15';
         ctx.fillText(`Eggs:${world.eggs.length}/Larvae:${larvaCount}`, 8, 30);
@@ -1627,17 +1916,17 @@ function loop(time: number) {
         ctx.fillText(`${world.timeScale.toFixed(1)}x`, viewW - 35, 30);
       } else {
         ctx.fillStyle = '#38bdf8';
-        ctx.fillText('BIO-COSMOS', 8, 17);
+        ctx.fillText('NEURAL-OCEAN', 8, 17);
         ctx.fillStyle = '#4ade80';
-        ctx.fillText(`Herb:${herbs}`, 78, 17);
+        ctx.fillText(`Herb:${herbs}`, 84, 17);
         ctx.fillStyle = '#34d399';
-        ctx.fillText(`Jelly:${jellies}`, 124, 17);
+        ctx.fillText(`Jelly:${jellies}`, 130, 17);
         ctx.fillStyle = '#f59e0b';
-        ctx.fillText(`Scav:${scavs}`, 174, 17);
+        ctx.fillText(`Scav:${scavs}`, 180, 17);
         ctx.fillStyle = '#f87171';
-        ctx.fillText(`Carn:${carns}`, 222, 17);
+        ctx.fillText(`Carn:${carns}`, 228, 17);
         ctx.fillStyle = '#facc15';
-        ctx.fillText(`Eggs:${world.eggs.length}/Larvae:${larvaCount}`, 270, 17);
+        ctx.fillText(`Eggs:${world.eggs.length}/Larvae:${larvaCount}`, 274, 17);
         ctx.fillStyle = '#a855f7';
         ctx.fillText(`Gen.${world.maxGen}`, Math.min(viewW - 75, 410), 17);
         ctx.fillStyle = '#cbd5e1';
@@ -1646,7 +1935,7 @@ function loop(time: number) {
     } else {
       ctx.fillStyle = '#38bdf8';
       ctx.font = 'bold 14px "JetBrains Mono", monospace';
-      ctx.fillText('BIO-COSMOS // NEURAL ECOSYSTEM SIMULATION', 20, 24);
+      ctx.fillText('NEURAL-OCEAN', 20, 24);
 
       ctx.font = '11px "JetBrains Mono", monospace';
       ctx.fillStyle = '#4ade80';

@@ -681,21 +681,21 @@ export class EcosystemWorld {
       base.rkStrategy = 0.4;
       base.parts = ['head_angler', 'body_symbiont'];
     } else if (type === 'chimera') {
-      base.speed = 3.6;
-      base.turnSpeed = 0.2;
-      base.senseRadius = 250;
-      base.size = 13.0;
-      base.color = [192, 38, 211];
+      base.speed = 3.4;
+      base.turnSpeed = 0.15;
+      base.senseRadius = 290;
+      base.size = 20.0;
+      base.color = [14, 116, 144];
       base.diet = 1.0;
-      base.metabolism = 0.35;
-      base.reproEnergy = 300;
-      base.poison = 0.8;
-      base.poisonResist = 0.9;
-      base.armor = 0.7;
-      base.biteForce = 0.9;
-      base.electricShock = 0.6;
-      base.segments = 7;
-      base.rkStrategy = 0.9;
+      base.metabolism = 0.38;
+      base.reproEnergy = 350;
+      base.poison = 0.85;
+      base.poisonResist = 0.95;
+      base.armor = 0.88;
+      base.biteForce = 0.95;
+      base.electricShock = 0.75;
+      base.segments = 9;
+      base.rkStrategy = 0.95;
       base.parts = ['head_horn', 'head_jaw', 'prop_ribbon', 'body_spikes'];
     }
     return base;
@@ -719,7 +719,7 @@ export class EcosystemWorld {
     let speed = mutateVal(parentDNA.speed, 0.5, 1.0, 5.5);
     let turnSpeed = mutateVal(parentDNA.turnSpeed, 0.04, 0.04, 0.3);
     let senseRadius = mutateVal(parentDNA.senseRadius, 35, 50, 320);
-    let size = mutateVal(parentDNA.size, 1.3, 3.2, 18.0);
+    let size = mutateVal(parentDNA.size, 1.3, 3.2, 26.0);
     let reproEnergy = mutateVal(parentDNA.reproEnergy, 25, 90, 360);
     let metabolism = mutateVal(parentDNA.metabolism, 0.03, 0.04, 0.5);
     let mutationRate = mutateVal(parentDNA.mutationRate, 0.03, 0.02, 0.4);
