@@ -212,55 +212,57 @@ canvas.addEventListener('mousedown', (e) => {
   if (e.button === 0) {
     const mx = e.clientX;
     const my = e.clientY;
-    const isCompact = canvas.height <= 450;
-        if (isDnaBankOpen) {
-          const bW = isCompact ? 320 : 360, bH = isCompact ? 210 : 230;
-          const bX = (canvas.width - bW) / 2, bY = (canvas.height - bH) / 2;
+    const viewW = window.innerWidth;
+    const viewH = window.innerHeight;
+    const isCompact = viewW <= 768 || viewH <= 500;
 
-          for (let s = 1; s <= 3; s++) {
-            const sy = bY + 34 + (s - 1) * 48;
-            if (mx >= bX + bW - 105 && mx <= bX + bW - 63 && my >= sy + 6 && my <= sy + 32) {
-              world.saveWorldState(s);
-              systemMessage = `スロット ${s} に保存しました`;
-              systemMessageTimer = 2.0;
-              return;
-            }
-            if (mx >= bX + bW - 55 && mx <= bX + bW - 13 && my >= sy + 6 && my <= sy + 32) {
-              if (world.loadWorldState(s)) {
-                systemMessage = `スロット ${s} を復元しました`;
-                selectedCreature = null;
-              } else {
-                systemMessage = `スロット ${s} は空です`;
-              }
-              systemMessageTimer = 2.0;
-              return;
-            }
-          }
-          const botY = bY + bH - 28;
-          if (mx >= bX + bW - 75 && mx <= bX + bW - 15 && my >= botY && my <= botY + 22) {
-            isDnaBankOpen = false;
-            return;
-          }
+    if (isDnaBankOpen) {
+      const bW = isCompact ? 300 : 360, bH = isCompact ? 190 : 230;
+      const bX = (viewW - bW) / 2, bY = (viewH - bH) / 2;
+
+      for (let s = 1; s <= 3; s++) {
+        const sy = bY + 28 + (s - 1) * (isCompact ? 42 : 48);
+        if (mx >= bX + bW - 100 && mx <= bX + bW - 60 && my >= sy + 6 && my <= sy + 28) {
+          world.saveWorldState(s);
+          systemMessage = `スロット ${s} に保存しました`;
+          systemMessageTimer = 2.0;
           return;
         }
+        if (mx >= bX + bW - 52 && mx <= bX + bW - 12 && my >= sy + 6 && my <= sy + 28) {
+          if (world.loadWorldState(s)) {
+            systemMessage = `スロット ${s} を復元しました`;
+            selectedCreature = null;
+          } else {
+            systemMessage = `スロット ${s} は空です`;
+          }
+          systemMessageTimer = 2.0;
+          return;
+        }
+      }
+      const botY = bY + bH - 26;
+      if (mx >= bX + bW - 70 && mx <= bX + bW - 12 && my >= botY && my <= botY + 18) {
+        isDnaBankOpen = false;
+        return;
+      }
+      return;
+    }
     if (isCatalogOpen) {
-      const isCompact = canvas.height <= 450 || canvas.width < 680;
-      const cW = isCompact ? Math.min(canvas.width - 16, 540) : 660;
-      const cH = isCompact ? Math.min(canvas.height - 16, 300) : 400;
-      const cX = (canvas.width - cW) / 2, cY = (canvas.height - cH) / 2;
-      const btnW = isCompact ? 55 : 65;
-      const btnH = isCompact ? 20 : 24;
-      const btnX = cX + cW - btnW - 12;
-      const btnY = cY + cH - btnH - 10;
+      const cW = isCompact ? Math.min(viewW - 16, 520) : 660;
+      const cH = isCompact ? Math.min(viewH - 16, 280) : 400;
+      const cX = (viewW - cW) / 2, cY = (viewH - cH) / 2;
+      const btnW = isCompact ? 50 : 65;
+      const btnH = isCompact ? 18 : 24;
+      const btnX = cX + cW - btnW - 10;
+      const btnY = cY + cH - btnH - 8;
       if (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH) {
         isCatalogOpen = false;
         return;
       }
-      const listX = cX + 12;
-      const listY = cY + 36;
+      const listX = cX + 10;
+      const listY = cY + 28;
       const cols = 3;
-      const itemW = isCompact ? 68 : 104;
-      const itemH = isCompact ? 36 : 48;
+      const itemW = isCompact ? 64 : 104;
+      const itemH = isCompact ? 32 : 48;
       const gapX = isCompact ? 4 : 6;
       const gapY = isCompact ? 4 : 6;
 
@@ -278,54 +280,54 @@ canvas.addEventListener('mousedown', (e) => {
     }
     const lm = world.latestMutant;
     if (lm && !lm.isDead && selectedCreature?.id !== lm.id) {
-      const lr = isCompact ? 28 : 34;
-      const lx = canvas.width - lr - 15;
-      const ly = canvas.height - lr - (isCompact ? 38 : 55);
+      const lr = isCompact ? 26 : 34;
+      const lx = viewW - lr - 15;
+      const ly = viewH - lr - (isCompact ? 36 : 55);
       if (Math.hypot(mx - lx, my - ly) <= lr + 6) {
         selectedCreature = lm;
-        targetCamX = lm.x - canvas.width / (2 * zoom);
-        targetCamY = lm.y - canvas.height / (2 * zoom);
+        targetCamX = lm.x - viewW / (2 * zoom);
+        targetCamY = lm.y - viewH / (2 * zoom);
         systemMessage = `変異種 #${lm.id} にフォーカス`;
         systemMessageTimer = 2.0;
         return;
       }
     }
     if (isResetConfirming) {
-      const dW = 280, dH = 110;
-      const dX = (canvas.width - dW) / 2;
-      const dY = (canvas.height - dH) / 2;
-      if (mx >= dX + 25 && mx <= dX + 125 && my >= dY + 60 && my <= dY + 95) {
+      const dW = 260, dH = 100;
+      const dX = (viewW - dW) / 2;
+      const dY = (viewH - dH) / 2;
+      if (mx >= dX + 20 && mx <= dX + 115 && my >= dY + 52 && my <= dY + 84) {
         world.initWorld();
         selectedCreature = null;
         isResetConfirming = false;
         isToolMenuOpen = false;
         return;
       }
-      if (mx >= dX + 155 && mx <= dX + 255 && my >= dY + 60 && my <= dY + 95) {
+      if (mx >= dX + 145 && mx <= dX + 240 && my >= dY + 52 && my <= dY + 84) {
         isResetConfirming = false;
         return;
       }
       isResetConfirming = false;
       return;
     }
-    const tabW = isCompact ? 140 : 160;
-    const tabH = isCompact ? 28 : 36;
-    const tabX = (canvas.width - tabW) / 2;
-    const tabY = canvas.height - (isCompact ? 34 : 46);
+    const tabW = isCompact ? 130 : 160;
+    const tabH = isCompact ? 26 : 36;
+    const tabX = (viewW - tabW) / 2;
+    const tabY = viewH - (isCompact ? 30 : 46);
 
     if (mx >= tabX && mx <= tabX + tabW && my >= tabY && my <= tabY + tabH) {
       isToolMenuOpen = !isToolMenuOpen;
       return;
     }
     if (isToolMenuOpen) {
-      const menuW = isCompact ? 160 : 190;
-      const itemH = isCompact ? 24 : 30;
-      const menuH = itemH * 8 + 10;
-      const menuX = (canvas.width - menuW) / 2;
-      const menuY = tabY - menuH - 6;
+      const menuW = isCompact ? 150 : 190;
+      const itemH = isCompact ? 22 : 30;
+      const menuH = itemH * 8 + 8;
+      const menuX = (viewW - menuW) / 2;
+      const menuY = tabY - menuH - 4;
 
       if (mx >= menuX && mx <= menuX + menuW && my >= menuY && my <= menuY + menuH) {
-        const itemIdx = Math.floor((my - (menuY + 5)) / itemH);
+        const itemIdx = Math.floor((my - (menuY + 4)) / itemH);
         if (itemIdx === 0) { currentTool = 'inspect'; isToolMenuOpen = false; }
         else if (itemIdx === 1) { currentTool = 'feed_all'; isToolMenuOpen = false; }
         else if (itemIdx === 2) { currentTool = 'meteor'; isToolMenuOpen = false; }
@@ -1580,7 +1582,9 @@ function loop(time: number) {
     ctx.restore();
 
     const isMobile = viewW <= 768 || viewH <= 500;
-    const barHeight = isMobile ? 26 : 56;
+    const isPortrait = viewW < viewH;
+    const barHeight = isMobile ? (isPortrait ? 38 : 26) : 56;
+
     ctx.fillStyle = 'rgba(2, 6, 23, 0.9)';
     ctx.fillRect(0, 0, viewW, barHeight);
     ctx.strokeStyle = '#1e293b';
@@ -1594,13 +1598,6 @@ function loop(time: number) {
       else if (c.dna.diet > 0.55) carns++;
       else herbs++;
     }
-
-    const isPortrait = viewW < viewH;
-    const barHeight = isMobile ? (isPortrait ? 38 : 26) : 56;
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.9)';
-    ctx.fillRect(0, 0, viewW, barHeight);
-    ctx.strokeStyle = '#1e293b';
-    ctx.strokeRect(0, 0, viewW, barHeight);
 
     if (isMobile) {
       ctx.font = '9px "JetBrains Mono", monospace';
@@ -1988,25 +1985,44 @@ function loop(time: number) {
     }
 
     if (isResetConfirming) {
-      const dW = 260, dH = 100;
-      const dX = (viewW - dW) / 2;
-      const dY = (viewH - dH) / 2;
+          const dW = 260, dH = 100;
+          const dX = (viewW - dW) / 2;
+          const dY = (viewH - dH) / 2;
 
-      ctx.fillStyle = 'rgba(2, 6, 23, 0.98)';
-      ctx.fillRect(dX, dY, dW, dH);
-      ctx.strokeStyle = '#f87171';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(dX, dY, dW, dH);
+          ctx.fillStyle = 'rgba(2, 6, 23, 0.98)';
+          ctx.fillRect(dX, dY, dW, dH);
+          ctx.strokeStyle = '#f87171';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(dX, dY, dW, dH);
 
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = 'bold 11px "JetBrains Mono", monospace';
-      ctx.t
+          ctx.fillStyle = '#f8fafc';
+          ctx.font = 'bold 11px "JetBrains Mono", monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('本当にリセットしますか？', viewW / 2, dY + 28);
 
-  } catch (err) {
-    console.error('Render Loop Error:', err);
-  }
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+          ctx.fillRect(dX + 20, dY + 52, 95, 32);
+          ctx.strokeStyle = '#fca5a5';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(dX + 20, dY + 52, 95, 32);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText('はい', dX + 67, dY + 72);
 
-  requestAnimationFrame(loop);
-}
+          ctx.fillStyle = 'rgba(51, 65, 85, 0.85)';
+          ctx.fillRect(dX + 145, dY + 52, 95, 32);
+          ctx.strokeStyle = '#94a3b8';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(dX + 145, dY + 52, 95, 32);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText('いいえ', dX + 192, dY + 72);
 
-requestAnimationFrame(loop);
+          ctx.textAlign = 'left';
+        }
+      } catch (err) {
+        console.error('Render Loop Error:', err);
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    requestAnimationFrame(loop);
