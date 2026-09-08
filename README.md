@@ -2,7 +2,7 @@
 
 Deep-sea ecosystem sandbox driven by small neural networks and genetic mutations.
 
-[Play Demo](https://sitrozyi.github.io/neural-ocean/)
+[Play](https://sitrozyi.github.io/neural-ocean/)
 
 ![fish](assets/fish0.gif)　
 
