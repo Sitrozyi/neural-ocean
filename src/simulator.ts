@@ -1,10 +1,142 @@
-export type CreatureType = 'herbivore' | 'carnivore' | 'scavenger' | 'solar_jelly' | 'chimera' | 'manta' | 'cleaner_shrimp';
+export type CreatureType = 'herbivore' | 'carnivore' | 'scavenger' | 'solar_jelly' | 'chimera' | 'manta' | 'cleaner_shrimp' | 'anglerfish' | 'nautilus';
 export type LifeStage = 'larva' | 'adult';
+export type ActionState = 'forage' | 'avoid' | 'rest' | 'court' | 'idle';
 
 export type PartGene =
   | 'prop_ribbon' | 'prop_fork' | 'prop_jet' | 'prop_paddle'
   | 'head_jaw' | 'head_horn' | 'head_angler' | 'head_beak'
   | 'body_spikes' | 'body_fin' | 'body_symbiont' | 'body_ink';
+
+export interface InternalDrive {
+  hunger: number;
+  fatigue: number;
+  reproductiveUrge: number;
+  socialNeed: number;
+}
+
+export interface Detritus {
+  x: number;
+  y: number;
+  z: number;
+  mass: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  age: number;
+  source: 'feces' | 'carcass' | 'plant_litter';
+}
+
+export class Swarm {
+  id: number;
+  members: Creature[] = [];
+  centroid: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+  velocity: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+  cohesion = 0.18;
+  separation = 0.95;
+  alignment = 0.35;
+  scatterTimer = 0;
+  scatterOrigin: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+
+  constructor(id: number) {
+    this.id = id;
+  }
+
+  update(dt: number, threats: Creature[]) {
+    this.members = this.members.filter(m => !m.isDead);
+    if (this.members.length === 0) return;
+
+    let cx = 0, cy = 0, cz = 0;
+    let vx = 0, vy = 0, vz = 0;
+    for (const m of this.members) {
+      cx += m.x;
+      cy += m.y;
+      cz += m.z;
+      vx += m.vx;
+      vy += m.vy;
+      vz += m.vz;
+    }
+    const count = this.members.length;
+    this.centroid = { x: cx / count, y: cy / count, z: cz / count };
+    this.velocity = { x: vx / count, y: vy / count, z: vz / count };
+
+    let nearestThreat: Creature | null = null;
+    let minThreatDist = 180;
+    for (const t of threats) {
+      if (t.isDead || t.dna.diet <= 0.55) continue;
+      const d = Math.hypot(t.x - this.centroid.x, t.y - this.centroid.y);
+      if (d < minThreatDist) {
+        minThreatDist = d;
+        nearestThreat = t;
+      }
+    }
+
+    if (nearestThreat && this.scatterTimer <= 0) {
+      this.scatterTimer = 1.6;
+      this.scatterOrigin = { x: nearestThreat.x, y: nearestThreat.y, z: nearestThreat.z };
+    }
+
+    if (this.scatterTimer > 0) {
+      this.scatterTimer -= dt;
+    }
+  }
+  applyToMembers(dt: number) {
+      if (this.members.length === 0) return;
+      const isScattering = this.scatterTimer > 0.6;
+
+      for (const m of this.members) {
+        if (m.currentAction === 'rest') continue;
+
+        if (isScattering) {
+          const dx = m.x - this.scatterOrigin.x;
+          const dy = m.y - this.scatterOrigin.y;
+          const scatterAngle = Math.atan2(dy, dx) + (Math.sin(m.id * 13) * 0.25);
+          let diff = scatterAngle - m.angle;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          m.angle += diff * Math.min(1, dt * 5.0);
+          m.sprintTimer = 0.5;
+          m.vz += (Math.random() - 0.5) * 0.02;
+        } else {
+          const cohAngle = Math.atan2(this.centroid.y - m.y, this.centroid.x - m.x);
+          let diffCoh = cohAngle - m.angle;
+          while (diffCoh < -Math.PI) diffCoh += Math.PI * 2;
+          while (diffCoh > Math.PI) diffCoh -= Math.PI * 2;
+
+          const aliAngle = Math.atan2(this.velocity.y, this.velocity.x);
+          let diffAli = aliAngle - m.angle;
+          while (diffAli < -Math.PI) diffAli += Math.PI * 2;
+          while (diffAli > Math.PI) diffAli -= Math.PI * 2;
+
+          let sepX = 0, sepY = 0;
+          let denseCount = 0;
+          for (const other of this.members) {
+            if (other.id === m.id) continue;
+            const d = Math.hypot(other.x - m.x, other.y - m.y);
+            if (d < 55 && d > 0.001) {
+              denseCount++;
+              const force = (55 - d) / 55;
+              sepX -= ((other.x - m.x) / d) * force * 1.8;
+              sepY -= ((other.y - m.y) / d) * force * 1.8;
+            }
+          }
+          let sepDiff = 0;
+          if (Math.hypot(sepX, sepY) > 0.01) {
+            const sepAngle = Math.atan2(sepY, sepX);
+            sepDiff = sepAngle - m.angle;
+            while (sepDiff < -Math.PI) sepDiff += Math.PI * 2;
+            while (sepDiff > Math.PI) sepDiff -= Math.PI * 2;
+          }
+          const dynamicCoh = denseCount > 4 ? 0.05 : 0.28;
+          const swarmSteer = diffCoh * dynamicCoh + diffAli * 0.62 + sepDiff * 0.95;
+          m.angle += Math.max(-0.06, Math.min(0.06, swarmSteer * 0.25));
+
+          const zDiff = this.centroid.z - m.z;
+          m.vz += zDiff * 0.03 * dt * 60;
+        }
+      }
+    }
+
+}
 
 export class NeuralBrain {
   inputSize = 10;
@@ -149,6 +281,7 @@ export interface Egg {
   type: CreatureType;
   x: number;
   y: number;
+  z: number;
   dna: DNA;
   brain: NeuralBrain;
   generation: number;
@@ -164,8 +297,10 @@ export interface Creature {
   type: CreatureType;
   x: number;
   y: number;
+  z: number;
   vx: number;
   vy: number;
+  vz: number;
   angle: number;
   energy: number;
   maxEnergy: number;
@@ -190,16 +325,26 @@ export interface Creature {
   electricCooldown: number;
   reproCooldown: number;
   warningSignal: number;
+  currentAction: ActionState;
+  internalDrive: InternalDrive;
+  swarmId?: number | null;
+  biteAnimTimer?: number;
+  lungeTimer?: number;
+  shellRetractTimer?: number;
+  anglerLurePhase?: number;
 }
 
 export interface Plant {
   id: number;
   x: number;
   y: number;
+  z: number;
   energy: number;
   size: number;
   maxSize: number;
-  type: 'algae' | 'fruit' | 'meat_remains' | 'whale_fall';
+  type: 'algae' | 'fruit' | 'meat_remains' | 'whale_fall' | 'marine_snow' | 'deep_coral' | 'biolume_plankton' | 'hydro_spore' | 'bacteria_mat';
+  stage?: 'flesh' | 'reef' | 'mineral';
+  stageTimer?: number;
 }
 
 export interface KelpNode {
@@ -207,14 +352,44 @@ export interface KelpNode {
   y: number;
 }
 
+export type VegetationType = 'giant_kelp' | 'sea_fern';
+
 export interface Kelp {
   id: number;
+  type: VegetationType;
   baseX: number;
   baseY: number;
   height: number;
   segmentCount: number;
   nodes: KelpNode[];
   phase: number;
+  color?: string;
+}
+
+export interface HydrothermalVent {
+  id: number;
+  x: number;
+  y: number;
+  height: number;
+  width: number;
+  craterWidth: number;
+  bubbleTimer: number;
+  temperature: number;
+}
+
+export interface ColossalShadow {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  speed: number;
+  length: number;
+  angle: number;
+  targetAngle: number;
+  turnTimer: number;
+  phase: number;
+  nodes: { x: number; y: number }[];
 }
 
 export interface CoralBranch {
@@ -491,11 +666,14 @@ export class EcosystemWorld {
   creatures: Creature[] = [];
   eggs: Egg[] = [];
   plants: Plant[] = [];
+  detritus: Detritus[] = [];
+  swarms: Swarm[] = [];
   obstacles: Obstacle[] = [];
   particles: Particle[] = [];
   shockwaves: Shockwave[] = [];
 
   nextId = 1;
+  nextSwarmId = 1;
   totalTime = 0;
   timeScale = 1.0;
 
@@ -515,7 +693,60 @@ export class EcosystemWorld {
   maxGen = 1;
   historyTimer = 0;
   kelps: Kelp[] = [];
+  hydrothermalVents: HydrothermalVent[] = [];
+  colossalShadow: ColossalShadow = {
+    x: 1600,
+    y: 1100,
+    z: 0.88,
+    vx: 15,
+    vy: 0,
+    speed: 15,
+    length: 850,
+    angle: 0,
+    targetAngle: 0,
+    turnTimer: 3.0,
+    phase: 0,
+    nodes: []
+  };
   naturalSpawnTimer = 0;
+
+  deepNutrients = 1.0;
+  entropyMap: Float32Array = new Float32Array(20 * 20);
+  entropyMaxPos: { x: number; y: number } = { x: 1600, y: 1000 };
+  entropyPeakValue = 0;
+  recentPredations: { x: number; y: number; time: number }[] = [];
+
+  getLightIntensity(z: number): number {
+    return Math.exp(-Math.max(0, Math.min(1, z)) * 2.8);
+  }
+
+  getFlowVector(x: number, y: number, z: number): { u: number; v: number; w: number } {
+    const kx = 0.0012;
+    const ky = 0.0015;
+    const t = this.totalTime * 0.05;
+    const u = -Math.cos(x * kx + t * 0.4) * Math.sin(y * ky + t * 0.3) * 0.42 + 0.12;
+    const v = Math.sin(x * kx + t * 0.4) * Math.cos(y * ky + t * 0.3) * 0.35 + Math.sin(t * 0.2 + x * 0.0005) * 0.08;
+    const w = Math.sin(x * 0.0015 + t * 0.15) * 0.0006 * (1.0 - z * 0.3);
+
+    return { u, v, w };
+  }
+
+  spawnDetritus(x: number, y: number, z: number, mass = 1.0, source: 'feces' | 'carcass' | 'plant_litter' = 'feces') {
+    if (this.detritus.length >= 3000) return;
+    const clampedMass = Math.max(0.5, Math.min(5.0, mass));
+    const vz = 0.0006 + Math.random() * 0.0014;
+    this.detritus.push({
+      x: Math.max(10, Math.min(this.width - 10, x + (Math.random() - 0.5) * 8)),
+      y: Math.max(10, Math.min(this.height - 10, y + (Math.random() - 0.5) * 8)),
+      z: Math.max(0, Math.min(1, z)),
+      mass: clampedMass,
+      vx: (Math.random() - 0.5) * 0.25,
+      vy: (Math.random() - 0.5) * 0.25,
+      vz,
+      age: 0,
+      source
+    });
+  }
 
   constructor() {
     this.creatureGrid = new SpatialGrid<Creature>(this.width, this.height, 90);
@@ -532,253 +763,304 @@ export class EcosystemWorld {
     this.creatures = [];
     this.eggs = [];
     this.plants = [];
+    this.detritus = [];
+    this.swarms = [];
     this.obstacles = [];
     this.particles = [];
     this.shockwaves = [];
     this.kelps = [];
+    this.hydrothermalVents = [];
     this.historyHerb = [];
     this.historyCarn = [];
     this.historyPlant = [];
     this.maxGen = 1;
     this.totalTime = 0;
     this.naturalSpawnTimer = 0;
+    this.deepNutrients = 1.0;
+    this.entropyMap.fill(0);
+    this.recentPredations = [];
 
-    const kelpCount = 30;
-    for (let i = 0; i < kelpCount; i++) {
-      const bx = (this.width / kelpCount) * (i + 0.5) + (Math.random() - 0.5) * 60;
-      const by = this.height - 25 - Math.random() * 80;
-      const kHeight = 240 + Math.random() * 260;
-      const segs = 6;
-      const nodes: KelpNode[] = [];
-      for (let s = 0; s <= segs; s++) {
-        nodes.push({ x: bx, y: by - (kHeight / segs) * s });
-      }
-      this.kelps.push({
-        id: this.nextId++,
-        baseX: bx,
-        baseY: by,
-        height: kHeight,
-        segmentCount: segs,
-        nodes,
-        phase: Math.random() * Math.PI * 2
-      });
+    const startX = this.width * 0.48;
+    const startY = this.height * 0.54;
+    const initNodes: { x: number; y: number }[] = [];
+    const nodeCount = 15;
+    const nodeSpacing = 58;
+    for (let i = 0; i < nodeCount; i++) {
+      initNodes.push({ x: startX - i * nodeSpacing, y: startY });
     }
 
-    const biomeCenters = [
-      { x: this.width * 0.28, y: this.height * 0.45, type: 'coral', radius: 420 },
-      { x: this.width * 0.72, y: this.height * 0.60, type: 'coral', radius: 380 },
-      { x: this.width * 0.50, y: this.height * 0.25, type: 'rock',  radius: 320 }
+    this.colossalShadow = {
+      x: startX,
+      y: startY,
+      z: 0.90,
+      vx: 14,
+      vy: 0,
+      speed: 14,
+      length: nodeCount * nodeSpacing,
+      angle: 0.05,
+      targetAngle: 0.05,
+      turnTimer: 3.5,
+      phase: 0,
+      nodes: initNodes
+    };
+    const grandVentX = this.width * 0.625;
+    const grandVentY = this.height - 10;
+    const grandVentH = 120;
+    const grandVentW = 320;
+
+    this.hydrothermalVents = [{
+      id: this.nextId++,
+      x: grandVentX,
+      y: grandVentY,
+      height: grandVentH,
+      width: grandVentW,
+      craterWidth: 50,
+      bubbleTimer: 0.35,
+      temperature: 0.7
+    }];
+
+    const zones = [
+      { startX: this.width * 0.02, width: this.width * 0.48, count: 28 }, // Left 50%: Continuous Dense Kelp Forest
+      { startX: this.width * 0.75, width: this.width * 0.23, count: 14 }  // Right 25%: Secondary Forest (50% to 75% is completely empty void)
     ];
 
-    for (let i = 0; i < 24; i++) {
-      const isCoral = i < 16;
-      const targetBiome = isCoral ? (i % 2 === 0 ? biomeCenters[0] : biomeCenters[1]) : biomeCenters[2];
+    for (const z of zones) {
+      for (let k = 0; k < z.count; k++) {
+        const norm = k / Math.max(1, z.count - 1);
+        const bx = z.startX + norm * z.width + (Math.random() - 0.5) * 18;
+        const by = this.height - 15 - Math.random() * 50;
+        const isBlue = Math.random() < 0.35;
+        const vType: VegetationType = isBlue ? 'sea_fern' : 'giant_kelp';
 
-      const clusterAngle = Math.random() * Math.PI * 2;
-      const clusterDist = Math.random() * targetBiome.radius * 0.85;
-      const obsX = targetBiome.x + Math.cos(clusterAngle) * clusterDist;
-      const obsY = targetBiome.y + Math.sin(clusterAngle) * clusterDist;
-      const rad = 40 + Math.random() * 45;
+        const kHeight = isBlue
+          ? (140 + Math.random() * 150)
+          : (220 + Math.random() * 260);
+        const segs = isBlue ? 5 : 6;
 
-      let branches: CoralBranch[] | undefined;
-      let rockVertices: RockVertex[] | undefined;
-
-      if (isCoral) {
-        branches = [];
-        const count = 5 + Math.floor(Math.random() * 3);
-        for (let b = 0; b < count; b++) {
-          const ang = (b / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
-          branches.push({
-            angle: ang,
-            length: rad * (0.65 + Math.random() * 0.35),
-            color: Math.random() < 0.5 ? 'rgba(225, 29, 72, 0.75)' : 'rgba(14, 165, 233, 0.75)',
-            subBranches: [
-              { angle: ang - 0.38, length: rad * 0.3 },
-              { angle: ang + 0.38, length: rad * 0.3 }
-            ]
-          });
+        const nodes: KelpNode[] = [];
+        for (let s = 0; s <= segs; s++) {
+          nodes.push({ x: bx, y: by - (kHeight / segs) * s });
         }
-      } else {
-        rockVertices = [];
-        const vCount = 8;
-        for (let v = 0; v < vCount; v++) {
-          rockVertices.push({
-            angle: (v / vCount) * Math.PI * 2,
-            radius: rad * (0.75 + Math.random() * 0.4)
-          });
-        }
-      }
 
-      this.obstacles.push({
-        id: this.nextId++,
-        x: Math.max(80, Math.min(this.width - 80, obsX)),
-        y: Math.max(80, Math.min(this.height - 80, obsY)),
-        radius: rad,
-        type: isCoral ? 'coral_reef' : 'rock',
-        passableSize: 6.8,
-        branches,
-        rockVertices,
-        glowColor: isCoral ? '#f43f5e' : '#0284c7'
-      });
-    }
-
-    for (let i = 0; i < 260; i++) {
-      if (Math.random() < 0.75) {
-        const b = biomeCenters[Math.floor(Math.random() * 2)];
-        const ang = Math.random() * Math.PI * 2;
-        const d = Math.random() * b.radius;
-        this.spawnPlant(b.x + Math.cos(ang) * d, b.y + Math.sin(ang) * d, 'algae');
-      } else {
-        this.spawnPlant(Math.random() * this.width, Math.random() * this.height, 'algae');
+        this.kelps.push({
+          id: this.nextId++,
+          type: vType,
+          baseX: bx,
+          baseY: by,
+          height: kHeight,
+          segmentCount: segs,
+          nodes,
+          phase: Math.random() * Math.PI * 2,
+          color: isBlue ? '#06b6d4' : '#059669'
+        });
       }
     }
+    this.obstacles = [];
 
-    for (let i = 0; i < 55; i++) {
-      const b = biomeCenters[i % 2];
-      const ang = Math.random() * Math.PI * 2;
-      const d = Math.random() * (b.radius * 0.7);
-      this.spawnCreature('herbivore', b.x + Math.cos(ang) * d, b.y + Math.sin(ang) * d, 1, undefined, undefined, 'adult');
-    }
-    for (let i = 0; i < 16; i++) {
-      this.spawnCreature('solar_jelly', Math.random() * this.width, Math.random() * (this.height * 0.45), 1, undefined, undefined, 'adult');
-    }
-    for (let i = 0; i < 14; i++) {
-      const b = biomeCenters[2];
-      this.spawnCreature('scavenger', b.x + (Math.random() - 0.5) * 200, b.y + (Math.random() - 0.5) * 200, 1, undefined, undefined, 'adult');
-    }
-    for (let i = 0; i < 10; i++) {
-      const outX = Math.random() < 0.5 ? Math.random() * (this.width * 0.2) : this.width * 0.8 + Math.random() * (this.width * 0.2);
-      const outY = Math.random() * this.height;
-      this.spawnCreature('carnivore', outX, outY, 1, undefined, undefined, 'adult');
-    }
-    for (let i = 0; i < 2; i++) {
-      this.spawnCreature('manta', this.width * (0.3 + i * 0.4), this.height * 0.35, 1, undefined, undefined, 'adult');
-    }
-    for (let i = 0; i < 8; i++) {
-      const b = biomeCenters[i % 2];
-      this.spawnCreature('cleaner_shrimp', b.x + (Math.random() - 0.5) * 180, b.y + (Math.random() - 0.5) * 180, 1, undefined, undefined, 'adult');
-    }
+        const spawnCenters = [
+          { x: this.width * 0.25, y: this.height * 0.45, radius: 280 },
+          { x: this.width * 0.65, y: this.height * 0.50, radius: 280 }
+        ];
+
+        for (let i = 0; i < 110; i++) {
+          const py = Math.random() * this.height;
+          const px = Math.random() * this.width;
+          let pType: Plant['type'] = 'algae';
+          if (py < this.height * 0.35) {
+            pType = Math.random() < 0.65 ? 'biolume_plankton' : (Math.random() < 0.2 ? 'fruit' : 'marine_snow');
+          } else if (py < this.height * 0.7) {
+            pType = Math.random() < 0.5 ? 'biolume_plankton' : (Math.random() < 0.25 ? 'algae' : 'marine_snow');
+          } else {
+            pType = Math.random() < 0.4 ? 'deep_coral' : (Math.random() < 0.3 ? 'hydro_spore' : 'marine_snow');
+          }
+          this.spawnPlant(px, py, pType);
+        }
+
+        for (let i = 0; i < 55; i++) {
+          const b = spawnCenters[i % 2];
+          const ang = Math.random() * Math.PI * 2;
+          const d = Math.random() * (b.radius * 0.7);
+          this.spawnCreature('herbivore', b.x + Math.cos(ang) * d, b.y + Math.sin(ang) * d, 1, undefined, undefined, 'adult');
+        }
+        for (let i = 0; i < 10; i++) {
+          this.spawnCreature('solar_jelly', Math.random() * this.width, Math.random() * (this.height * 0.35), 1, undefined, undefined, 'adult');
+        }
+        for (let i = 0; i < 14; i++) {
+          const scavY = this.height * 0.72 + Math.random() * (this.height * 0.24);
+          this.spawnCreature('scavenger', Math.random() * this.width, scavY, 1, undefined, undefined, 'adult');
+        }
+        for (let i = 0; i < 4; i++) {
+          const outX = Math.random() < 0.5 ? Math.random() * (this.width * 0.25) : this.width * 0.75 + Math.random() * (this.width * 0.25);
+          const outY = this.height * (0.28 + Math.random() * 0.42);
+          this.spawnCreature('carnivore', outX, outY, 1, undefined, undefined, 'adult');
+        }
+        for (let i = 0; i < 2; i++) {
+          this.spawnCreature('manta', this.width * (0.3 + i * 0.4), this.height * 0.35, 1, undefined, undefined, 'adult');
+        }
+        for (let i = 0; i < 14; i++) {
+          this.spawnCreature('cleaner_shrimp', Math.random() * this.width, this.height * (0.55 + Math.random() * 0.3), 1, undefined, undefined, 'adult');
+        }
+        for (let i = 0; i < 6; i++) {
+          const angY = this.height * (0.80 + (i % 4) * 0.04) + (Math.random() - 0.5) * 30;
+          this.spawnCreature('anglerfish', (this.width / 6) * (i + 0.5), angY, 1, undefined, undefined, 'adult');
+        }
   }
 
   createDefaultDNA(type: CreatureType): DNA {
-    const base: DNA = {
-      speed: 2.3,
-      turnSpeed: 0.12,
-      senseRadius: 135,
-      size: 5.2,
-      color: [40, 190, 160],
-      reproEnergy: 140,
-      metabolism: 0.14,
-      mutationRate: 0.14,
-      maxAge: 65,
-      camouflage: 0.1,
-      diet: 0.05,
-      segments: 4,
-      poison: 0,
-      poisonResist: 0,
-      armor: 0,
-      biteForce: 0.1,
-      electricShock: 0,
-      photosynthesis: 0,
-      scavengerDrive: 0,
-      rkStrategy: 0.5,
-      parts: []
-    };
+      const base: DNA = {
+        speed: 1.4,
+        turnSpeed: 0.08,
+        senseRadius: 140,
+        size: 5.2,
+        color: [40, 190, 160],
+        reproEnergy: 130,
+        metabolism: 0.10,
+        mutationRate: 0.14,
+        maxAge: 75,
+        camouflage: 0.1,
+        diet: 0.05,
+        segments: 4,
+        poison: 0,
+        poisonResist: 0,
+        armor: 0,
+        biteForce: 0.1,
+        electricShock: 0,
+        photosynthesis: 0,
+        scavengerDrive: 0,
+        rkStrategy: 0.5,
+        parts: []
+      };
 
-    if (type === 'herbivore') {
-      base.speed = 2.4 + Math.random() * 0.4;
-      base.size = 5.0 + Math.random() * 1.2;
-      base.color = [40 + Math.random() * 30, 200 + Math.random() * 40, 160 + Math.random() * 40];
-      base.poison = Math.random() < 0.25 ? 0.7 : 0;
-      base.armor = Math.random() < 0.2 ? 0.6 : 0;
-      base.rkStrategy = Math.random() < 0.5 ? 0.25 : 0.75;
-      base.parts = ['prop_fork', Math.random() < 0.4 ? 'body_symbiont' : 'body_fin'];
-    } else if (type === 'carnivore') {
-      base.speed = 3.1 + Math.random() * 0.3;
-      base.senseRadius = 175;
-      base.size = 8.5 + Math.random() * 1.5;
-      base.color = [245, 50, 60];
-      base.diet = 0.95;
-      base.metabolism = 0.26;
-      base.reproEnergy = 210;
-      base.biteForce = 0.5;
-      base.segments = 5;
-      base.rkStrategy = 0.8;
-      base.parts = ['head_jaw', 'prop_jet', 'body_spikes'];
-    } else if (type === 'scavenger') {
-      base.speed = 1.8;
-      base.senseRadius = 240;
-      base.size = 4.8;
-      base.color = [217, 119, 6];
-      base.scavengerDrive = 0.95;
-      base.diet = 0.1;
-      base.armor = 0.85;
-      base.rkStrategy = 0.3;
-      base.parts = ['prop_paddle', 'head_beak'];
-    } else if (type === 'solar_jelly') {
-      base.speed = 1.1;
-      base.senseRadius = 75;
-      base.size = 7.0;
-      base.color = [52, 211, 153];
-      base.photosynthesis = 0.85;
-      base.metabolism = 0.06;
-      base.reproEnergy = 190;
-      base.electricShock = 0.6;
-      base.maxAge = 50;
-      base.rkStrategy = 0.4;
-      base.parts = ['head_angler', 'body_symbiont'];
-    } else if (type === 'chimera') {
-      base.speed = 3.4;
-      base.turnSpeed = 0.15;
-      base.senseRadius = 290;
-      base.size = 20.0;
-      base.color = [14, 116, 144];
-      base.diet = 1.0;
-      base.metabolism = 0.38;
-      base.reproEnergy = 350;
-      base.maxAge = 180;
-      base.poison = 0.85;
-      base.poisonResist = 0.95;
-      base.armor = 0.88;
-      base.biteForce = 0.95;
-      base.electricShock = 0.75;
-      base.segments = 9;
-      base.rkStrategy = 0.95;
-      base.parts = ['head_horn', 'head_jaw', 'prop_ribbon', 'body_spikes'];
-    } else if (type === 'manta') {
-      base.speed = 1.9;
-      base.turnSpeed = 0.08;
-      base.senseRadius = 260;
-      base.size = 17.0;
-      base.color = [30, 64, 125];
-      base.diet = 0.0;
-      base.metabolism = 0.16;
-      base.reproEnergy = 320;
-      base.maxAge = 140;
-      base.armor = 0.65;
-      base.segments = 4;
-      base.rkStrategy = 0.88;
-      base.parts = ['body_fin', 'prop_ribbon'];
-    } else if (type === 'cleaner_shrimp') {
-      base.speed = 1.6;
-      base.turnSpeed = 0.22;
-      base.senseRadius = 130;
-      base.size = 3.8;
-      base.color = [244, 114, 182];
-      base.diet = 0.0;
-      base.scavengerDrive = 0.85;
-      base.metabolism = 0.08;
-      base.reproEnergy = 130;
-      base.maxAge = 75;
-      base.armor = 0.35;
-      base.segments = 4;
-      base.rkStrategy = 0.35;
-      base.parts = ['head_beak', 'body_symbiont'];
+      if (type === 'herbivore') {
+        base.speed = 1.35 + Math.random() * 0.25;
+        base.size = 5.0 + Math.random() * 1.2;
+        base.color = [40 + Math.random() * 30, 200 + Math.random() * 40, 160 + Math.random() * 40];
+        base.poison = Math.random() < 0.25 ? 0.7 : 0;
+        base.armor = Math.random() < 0.2 ? 0.6 : 0;
+        base.rkStrategy = Math.random() < 0.5 ? 0.25 : 0.75;
+        base.parts = ['prop_fork', Math.random() < 0.4 ? 'body_symbiont' : 'body_fin'];
+      } else if (type === 'carnivore') {
+            base.speed = 1.4;
+            base.turnSpeed = 0.045;
+            base.senseRadius = 240;
+            base.size = 7.6 + Math.random() * 1.0;
+            base.color = [225, 29, 72];
+            base.diet = 0.95;
+            base.metabolism = 0.045;
+            base.reproEnergy = 280;
+            base.biteForce = 0.85;
+            base.segments = 5;
+            base.rkStrategy = 0.85;
+            base.parts = ['head_jaw', 'prop_fork', 'body_fin'];
+          } else if (type === 'scavenger') {
+        base.speed = 1.05;
+        base.senseRadius = 200;
+        base.size = 4.8;
+        base.color = [217, 119, 6];
+        base.scavengerDrive = 0.95;
+        base.diet = 0.05;
+        base.armor = 0.35;
+        base.rkStrategy = 0.45;
+        base.parts = ['prop_paddle', 'head_beak'];
+      } else if (type === 'solar_jelly') {
+        base.speed = 0.65;
+        base.senseRadius = 75;
+        base.size = 7.0;
+        base.color = [52, 211, 153];
+        base.photosynthesis = 0.85;
+        base.metabolism = 0.05;
+        base.reproEnergy = 170;
+        base.electricShock = 0.6;
+        base.maxAge = 60;
+        base.rkStrategy = 0.4;
+        base.parts = ['head_angler', 'body_symbiont'];
+      } else if (type === 'chimera') {
+        base.speed = 2.2;
+        base.turnSpeed = 0.035;
+        base.senseRadius = 380;
+        base.size = 36.0;
+        base.color = [3, 20, 48];
+        base.diet = 1.0;
+        base.metabolism = 0.12;
+        base.reproEnergy = 720;
+        base.maxAge = 500;
+        base.poison = 0.95;
+        base.poisonResist = 1.0;
+        base.armor = 0.98;
+        base.biteForce = 1.0;
+        base.electricShock = 0.92;
+        base.segments = 12;
+        base.mutationRate = 0.0;
+        base.rkStrategy = 0.98;
+        base.parts = ['head_horn', 'head_jaw', 'prop_ribbon', 'body_spikes'];
+      } else if (type === 'manta') {
+        base.speed = 1.15;
+        base.turnSpeed = 0.06;
+        base.senseRadius = 260;
+        base.size = 17.0;
+        base.color = [30, 64, 125];
+        base.diet = 0.0;
+        base.metabolism = 0.11;
+        base.reproEnergy = 260;
+        base.maxAge = 160;
+        base.armor = 0.65;
+        base.segments = 4;
+        base.rkStrategy = 0.88;
+        base.parts = ['body_fin', 'prop_ribbon'];
+      } else if (type === 'cleaner_shrimp') {
+        base.speed = 0.95;
+        base.turnSpeed = 0.16;
+        base.senseRadius = 130;
+        base.size = 3.8;
+        base.color = [244, 114, 182];
+        base.diet = 0.0;
+        base.scavengerDrive = 0.85;
+        base.metabolism = 0.08;
+        base.reproEnergy = 190;
+        base.maxAge = 85;
+        base.armor = 0.35;
+        base.segments = 4;
+        base.rkStrategy = 0.35;
+        base.parts = ['head_beak', 'body_symbiont'];
+      } else if (type === 'anglerfish') {
+        base.speed = 0.65;
+        base.turnSpeed = 0.04;
+        base.senseRadius = 260;
+        base.size = 15.0;
+        base.color = [15, 23, 42];
+        base.diet = 0.95;
+        base.metabolism = 0.02;
+        base.reproEnergy = 260;
+        base.maxAge = 240;
+        base.biteForce = 1.0;
+        base.armor = 0.65;
+        base.segments = 3;
+        base.rkStrategy = 0.85;
+        base.parts = ['head_angler', 'head_jaw'];
+      } else if (type === 'nautilus') {
+        base.speed = 0.85;
+        base.turnSpeed = 0.08;
+        base.senseRadius = 150;
+        base.size = 7.5;
+        base.color = [241, 245, 249];
+        base.diet = 0.1;
+        base.scavengerDrive = 0.85;
+        base.metabolism = 0.05;
+        base.reproEnergy = 150;
+        base.maxAge = 180;
+        base.armor = 0.98;
+        base.segments = 3;
+        base.rkStrategy = 0.8;
+        base.parts = ['head_beak', 'body_fin'];
+      }
+      return base;
     }
-    return base;
-  }
 
-  mutateDNA(parentDNA: DNA): DNA {
+    mutateDNA(parentDNA: DNA): DNA {
+        if (parentDNA.parts?.includes('head_horn') && parentDNA.size >= 22.0) {
+          return { ...parentDNA, size: 36.0, color: [3, 20, 48], segments: 12, turnSpeed: 0.035, reproEnergy: 720, mutationRate: 0.0 };
+        }
+
     const m = parentDNA.mutationRate;
     const mutateVal = (val: number, delta: number, min: number, max: number) => {
       if (Math.random() < m) {
@@ -793,17 +1075,17 @@ export class EcosystemWorld {
       Math.floor(mutateVal(parentDNA.color[2], 40, 10, 255))
     ];
 
-    let speed = mutateVal(parentDNA.speed, 0.5, 1.0, 5.5);
-    let turnSpeed = mutateVal(parentDNA.turnSpeed, 0.04, 0.04, 0.3);
-    let senseRadius = mutateVal(parentDNA.senseRadius, 35, 50, 320);
-    let size = mutateVal(parentDNA.size, 1.3, 3.2, 26.0);
-    let reproEnergy = mutateVal(parentDNA.reproEnergy, 25, 90, 360);
-    let metabolism = mutateVal(parentDNA.metabolism, 0.03, 0.04, 0.5);
-    let mutationRate = mutateVal(parentDNA.mutationRate, 0.03, 0.02, 0.4);
-    let maxAge = mutateVal(parentDNA.maxAge, 10, 20, 160);
+    let speed = mutateVal(parentDNA.speed, 0.3, 0.6, 3.2);
+    let turnSpeed = mutateVal(parentDNA.turnSpeed, 0.02, 0.03, 0.18);
+    let senseRadius = mutateVal(parentDNA.senseRadius, 35, 50, 260);
+    let size = mutateVal(parentDNA.size, 0.8, 3.5, 9.5);
+    let reproEnergy = mutateVal(parentDNA.reproEnergy, 25, 90, 240);
+    let metabolism = mutateVal(parentDNA.metabolism, 0.03, 0.04, 0.3);
+    let mutationRate = mutateVal(parentDNA.mutationRate, 0.03, 0.02, 0.3);
+    let maxAge = mutateVal(parentDNA.maxAge, 10, 20, 140);
     let camouflage = mutateVal(parentDNA.camouflage, 0.12, 0.0, 0.95);
-    let diet = mutateVal(parentDNA.diet, 0.08, 0.0, 1.0);
-    let segments = Math.round(mutateVal(parentDNA.segments, 0.8, 3, 7));
+    let diet = mutateVal(parentDNA.diet, 0.04, 0.0, parentDNA.diet < 0.4 ? 0.35 : 1.0);
+    let segments = Math.round(mutateVal(parentDNA.segments, 0.6, 3, 5));
     let poison = mutateVal(parentDNA.poison, 0.2, 0.0, 1.0);
     let poisonResist = mutateVal(parentDNA.poisonResist, 0.2, 0.0, 1.0);
     let armor = mutateVal(parentDNA.armor, 0.2, 0.0, 1.0);
@@ -827,13 +1109,7 @@ export class EcosystemWorld {
 
     let isAncient = false;
     let isCrystal = false;
-    if (Math.random() < 0.001) {
-      isAncient = true;
-      size = Math.min(22.0, size * 3.5);
-      maxAge *= 2.5;
-      newColor = [220, 38, 38];
-      parts = ['head_horn', 'head_jaw', 'prop_ribbon', 'body_spikes'];
-    } else if (Math.random() < 0.002) {
+    if (Math.random() < 0.002) {
       isCrystal = true;
       armor = 0.95;
       newColor = [224, 242, 254];
@@ -882,10 +1158,11 @@ export class EcosystemWorld {
   }
 
   layEggs(parent: Creature) {
-    const isK = parent.dna.rkStrategy > 0.55;
-    const eggCount = isK ? (Math.random() < 0.7 ? 1 : 2) : (3 + Math.floor(Math.random() * 3));
-    const eggSize = isK ? parent.dna.size * 0.45 : parent.dna.size * 0.25;
-    const hatchTime = isK ? 4.0 : 6.5;
+    const isChimera = parent.type === 'chimera';
+    const isK = parent.dna.rkStrategy > 0.55 || isChimera;
+    const eggCount = isChimera ? 1 : isK ? (Math.random() < 0.7 ? 1 : 2) : (3 + Math.floor(Math.random() * 3));
+    const eggSize = isChimera ? parent.dna.size * 0.35 : isK ? parent.dna.size * 0.45 : parent.dna.size * 0.25;
+    const hatchTime = isChimera ? 14.0 : isK ? 4.0 : 6.5;
 
     for (let e = 0; e < eggCount; e++) {
       const offX = parent.x + (Math.random() - 0.5) * 25;
@@ -898,6 +1175,7 @@ export class EcosystemWorld {
         type: parent.type,
         x: Math.max(20, Math.min(this.width - 20, offX)),
         y: Math.max(20, Math.min(this.height - 20, offY)),
+        z: Math.max(0, Math.min(1, parent.z + (Math.random() - 0.5) * 0.05)),
         dna: mutatedDNA,
         brain: mutatedBrain,
         generation: parent.generation + 1,
@@ -1014,12 +1292,12 @@ export class EcosystemWorld {
         totalTime: this.totalTime,
         maxGen: this.maxGen,
         creatures: this.creatures.map(c => ({
-          type: c.type, x: c.x, y: c.y, energy: c.energy, maxEnergy: c.maxEnergy,
+          type: c.type, x: c.x, y: c.y, z: c.z, energy: c.energy, maxEnergy: c.maxEnergy,
           age: c.age, stage: c.stage, growth: c.growth, generation: c.generation,
           kills: c.kills, children: c.children, dna: c.dna
         })),
         plants: this.plants.map(p => ({
-          x: p.x, y: p.y, energy: p.energy, size: p.size, maxSize: p.maxSize, type: p.type
+          x: p.x, y: p.y, z: p.z, energy: p.energy, size: p.size, maxSize: p.maxSize, type: p.type
         }))
       };
       localStorage.setItem(`biocosmos_slot_${slot}`, JSON.stringify(state));
@@ -1043,11 +1321,11 @@ export class EcosystemWorld {
 
       for (const p of state.plants) {
         this.plants.push({
-          id: this.nextId++, x: p.x, y: p.y, energy: p.energy, size: p.size, maxSize: p.maxSize, type: p.type
+          id: this.nextId++, x: p.x, y: p.y, z: p.z ?? (p.y / this.height), energy: p.energy, size: p.size, maxSize: p.maxSize, type: p.type
         });
       }
       for (const sc of state.creatures) {
-        const c = this.spawnCreature(sc.type, sc.x, sc.y, sc.generation, sc.dna, undefined, sc.stage);
+        const c = this.spawnCreature(sc.type, sc.x, sc.y, sc.generation, sc.dna, undefined, sc.stage, null, sc.z);
         c.energy = sc.energy;
         c.maxEnergy = sc.maxEnergy;
         c.age = sc.age;
@@ -1055,6 +1333,15 @@ export class EcosystemWorld {
         c.kills = sc.kills || 0;
         c.children = sc.children || 0;
       }
+      const legacyCarns = this.creatures.filter(c => c.dna.diet > 0.55 && c.type !== 'chimera' && c.type !== 'anglerfish');
+      if (legacyCarns.length > 4) {
+        for (let i = 4; i < legacyCarns.length; i++) {
+          legacyCarns[i].isDead = true;
+        }
+        this.creatures = this.creatures.filter(c => !c.isDead);
+      }
+
+      this.obstacles = [];
       localStorage.setItem('biocosmos_last_slot', slot.toString());
       return true;
     } catch (_) {
@@ -1073,19 +1360,31 @@ export class EcosystemWorld {
     }
   }
 
-  spawnCreature(type: CreatureType, x: number, y: number, gen: number, parentDNA?: DNA, parentBrain?: NeuralBrain, stage: LifeStage = 'larva', parentId: number | null = null): Creature {
+  spawnCreature(type: CreatureType, x: number, y: number, gen: number, parentDNA?: DNA, parentBrain?: NeuralBrain, stage: LifeStage = 'larva', parentId: number | null = null, initialZ?: number): Creature {
     const dna = parentDNA ? this.mutateDNA(parentDNA) : this.createDefaultDNA(type);
     const brain = new NeuralBrain(parentBrain, dna.mutationRate);
 
     let resolvedType = type;
     if (parentDNA) {
-      if (type === 'manta' || type === 'cleaner_shrimp') {
+      if (type === 'manta' || type === 'cleaner_shrimp' || type === 'chimera' || type === 'anglerfish' || type === 'nautilus') {
         resolvedType = type;
       } else if (dna.photosynthesis > 0.55) resolvedType = 'solar_jelly';
       else if (dna.scavengerDrive > 0.55) resolvedType = 'scavenger';
       else if (dna.diet > 0.65) resolvedType = 'carnivore';
       else resolvedType = 'herbivore';
     }
+
+    let spawnZ = initialZ !== undefined ? initialZ : (
+      resolvedType === 'solar_jelly' ? 0.05 + Math.random() * 0.25 :
+      resolvedType === 'scavenger' ? 0.8 + Math.random() * 0.18 :
+      resolvedType === 'chimera' ? 0.6 + Math.random() * 0.35 :
+      resolvedType === 'manta' ? 0.25 + Math.random() * 0.4 :
+      resolvedType === 'cleaner_shrimp' ? 0.4 + Math.random() * 0.3 :
+      resolvedType === 'anglerfish' ? 0.88 :
+      resolvedType === 'nautilus' ? 0.45 + Math.random() * 0.35 :
+      resolvedType === 'carnivore' ? 0.35 + Math.random() * 0.5 :
+      0.2 + Math.random() * 0.45
+    );
 
     const ang = Math.random() * Math.PI * 2;
     const isAdult = stage === 'adult';
@@ -1108,8 +1407,10 @@ export class EcosystemWorld {
       type: resolvedType,
       x: Math.max(20, Math.min(this.width - 20, x)),
       y: Math.max(20, Math.min(this.height - 20, y)),
+      z: Math.max(0, Math.min(1, spawnZ)),
       vx: Math.cos(ang) * dna.speed,
       vy: Math.sin(ang) * dna.speed,
+      vz: 0,
       angle: ang,
       energy: maxE * 0.7,
       maxEnergy: maxE,
@@ -1132,8 +1433,19 @@ export class EcosystemWorld {
       stunTimer: 0,
       poisonTimer: 0,
       electricCooldown: 0,
-      reproCooldown: 8.0,
-      warningSignal: 0
+      reproCooldown: resolvedType === 'chimera' ? 45.0 : 8.0,
+      warningSignal: 0,
+      currentAction: 'idle',
+      internalDrive: {
+        hunger: 0.2,
+        fatigue: 0.0,
+        reproductiveUrge: 0.0,
+        socialNeed: 0.5
+      },
+      biteAnimTimer: 0,
+      lungeTimer: 0,
+      shellRetractTimer: 0,
+      anglerLurePhase: Math.random() * Math.PI * 2
     };
 
     this.creatures.push(c);
@@ -1141,32 +1453,78 @@ export class EcosystemWorld {
     return c;
   }
 
-  spawnPlant(x: number, y: number, type: 'algae' | 'fruit' | 'meat_remains' | 'whale_fall' = 'algae') {
-    if (this.plants.length >= 480 && type !== 'whale_fall') return;
+  spawnPlant(x: number, y: number, type: Plant['type'] = 'algae', z?: number) {
+    if (type === 'meat_remains' || type === 'whale_fall') {
+      let carcassCount = 0;
+      for (let i = 0; i < this.plants.length; i++) {
+        const pt = this.plants[i].type;
+        if (pt === 'meat_remains' || pt === 'whale_fall') {
+          carcassCount++;
+        }
+      }
+      if (carcassCount >= 5) return;
+    }
+
+    if (this.plants.length >= 200 && type !== 'whale_fall') return;
     let energy = 28 + Math.random() * 18;
     let size = 2.5;
     let maxSize = 5.0 + Math.random() * 2.5;
+    let pZ = z !== undefined ? z : 0.2;
 
     if (type === 'fruit') {
       energy = 55 + Math.random() * 20;
       maxSize = 6.5;
+      pZ = z ?? (0.1 + Math.random() * 0.25);
     } else if (type === 'meat_remains') {
-      energy = 45 + Math.random() * 25;
-      maxSize = 6.0;
+      energy = 75 + Math.random() * 35;
+      size = 6.5;
+      maxSize = 11.0;
+      pZ = z ?? Math.min(1.0, (y / this.height) * 0.6 + 0.3);
     } else if (type === 'whale_fall') {
-      energy = 480;
-      size = 18.0;
-      maxSize = 22.0;
+      energy = 950;
+      size = 48.0;
+      maxSize = 56.0;
+      pZ = z ?? 0.3;
+    } else if (type === 'marine_snow') {
+      energy = 16 + Math.random() * 12;
+      size = 1.4;
+      maxSize = 2.2;
+      pZ = z ?? (0.5 + Math.random() * 0.45);
+    } else if (type === 'deep_coral') {
+      energy = 38 + Math.random() * 18;
+      size = 3.5;
+      maxSize = 7.5;
+      pZ = z ?? (0.85 + Math.random() * 0.14);
+    } else if (type === 'biolume_plankton') {
+      energy = 22 + Math.random() * 14;
+      size = 2.0;
+      maxSize = 4.2;
+      pZ = z ?? (0.15 + Math.random() * 0.35);
+    } else if (type === 'hydro_spore') {
+      energy = 50 + Math.random() * 25;
+      size = 3.0;
+      maxSize = 5.8;
+      pZ = z ?? (0.75 + Math.random() * 0.2);
+    } else if (type === 'bacteria_mat') {
+      energy = 35 + this.deepNutrients * 12;
+      size = 3.8;
+      maxSize = 7.0;
+      pZ = z ?? (0.88 + Math.random() * 0.1);
+    } else {
+      pZ = z ?? Math.min(0.35, (y / this.height) * 0.35 + Math.random() * 0.05);
     }
 
     this.plants.push({
       id: this.nextId++,
       x: Math.max(15, Math.min(this.width - 15, x)),
       y: Math.max(15, Math.min(this.height - 15, y)),
+      z: Math.max(0, Math.min(1, pZ)),
       energy,
       size,
       maxSize,
-      type
+      type,
+      stage: type === 'whale_fall' ? 'flesh' : undefined,
+      stageTimer: type === 'whale_fall' ? 0 : undefined
     });
   }
 
@@ -1200,6 +1558,108 @@ export class EcosystemWorld {
     for (let i = 0; i < this.plants.length; i++) {
       this.plantGrid.insert(this.plants[i]);
     }
+    const cs = this.colossalShadow;
+    cs.phase += dt * 0.55;
+    cs.turnTimer -= dt;
+
+    if (cs.turnTimer <= 0) {
+      cs.turnTimer = 6.0 + Math.random() * 8.0;
+      const marginX = this.width * 0.18;
+      const marginY = this.height * 0.22;
+      if (cs.x < marginX || cs.x > this.width - marginX || cs.y < marginY || cs.y > this.height - marginY) {
+        cs.targetAngle = Math.atan2(this.height * 0.58 - cs.y, this.width * 0.5 - cs.x) + (Math.random() - 0.5) * 0.4;
+      } else {
+        cs.targetAngle += (Math.random() - 0.5) * 1.1;
+      }
+    }
+
+    let angleDiff = cs.targetAngle - cs.angle;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    cs.angle += angleDiff * Math.min(1.0, dt * 0.35);
+
+    cs.z = 0.75 + Math.sin(cs.phase * 0.25) * 0.15;
+    const currentSpeed = cs.speed * (0.85 + Math.sin(cs.phase * 0.4) * 0.15);
+    cs.vx = Math.cos(cs.angle) * currentSpeed;
+    cs.vy = Math.sin(cs.angle) * currentSpeed;
+
+    cs.x += cs.vx * dt;
+    cs.y += cs.vy * dt;
+
+    if (cs.x < -cs.length) cs.x = this.width + cs.length * 0.5;
+    if (cs.x > this.width + cs.length) cs.x = -cs.length * 0.5;
+    if (cs.y < this.height * 0.25) cs.y = this.height * 0.25;
+    if (cs.y > this.height - 80) cs.y = this.height - 80;
+
+    if (cs.nodes.length === 0) {
+      const nodeCount = 15;
+      for (let n = 0; n < nodeCount; n++) cs.nodes.push({ x: cs.x, y: cs.y });
+    }
+    cs.nodes[0] = { x: cs.x, y: cs.y };
+    const segSpacing = 58;
+    for (let n = 1; n < cs.nodes.length; n++) {
+      const prev = cs.nodes[n - 1];
+      const curr = cs.nodes[n];
+      const dx = curr.x - prev.x;
+      const dy = curr.y - prev.y;
+      const d = Math.hypot(dx, dy) || 0.001;
+      curr.x = prev.x + (dx / d) * segSpacing;
+      curr.y = prev.y + (dy / d) * segSpacing;
+    }
+    for (let v = 0; v < this.hydrothermalVents.length; v++) {
+      const vent = this.hydrothermalVents[v];
+      vent.bubbleTimer -= dt;
+
+      if (vent.bubbleTimer <= 0) {
+        vent.bubbleTimer = 0.3 + Math.random() * 0.4;
+        const emitX = vent.x + (Math.random() - 0.5) * (vent.craterWidth * 0.6);
+        const emitY = vent.y - vent.height + 6;
+        const bubbleVx = (Math.random() - 0.5) * 0.2 + Math.sin(this.totalTime * 1.2) * 0.15;
+        const bubbleVy = -0.55 - Math.random() * 0.45;
+        const bubbleColor = Math.random() < 0.4 ? 'rgba(56, 189, 248, 0.45)' : 'rgba(251, 191, 36, 0.4)';
+        this.addParticle(emitX, emitY, bubbleVx, bubbleVy, bubbleColor, 1.2 + Math.random() * 1.4, 4.0 + Math.random() * 3.0, 'bubble');
+        if (Math.random() < 0.35) {
+          const hazeVx = (Math.random() - 0.5) * 0.25;
+          const hazeVy = -0.35 - Math.random() * 0.3;
+          this.addParticle(emitX, emitY, hazeVx, hazeVy, 'rgba(15, 23, 42, 0.25)', 3.0 + Math.random() * 2.5, 3.0 + Math.random() * 2.0, 'smoke');
+        }
+      }
+    }
+    for (let i = this.detritus.length - 1; i >= 0; i--) {
+      const d = this.detritus[i];
+      const flow = this.getFlowVector(d.x, d.y, d.z);
+      d.vx = d.vx * 0.94 + (Math.random() - 0.5) * 0.08;
+      d.vy = d.vy * 0.94 + (Math.random() - 0.5) * 0.08;
+
+      d.x += (d.vx + flow.u * 0.45) * dt * 60;
+      d.y += (d.vy + flow.v * 0.45) * dt * 60;
+      d.z += (d.vz + flow.w) * dt * 60;
+      d.age += dt;
+      if (d.x < 0) d.x += this.width;
+      if (d.x > this.width) d.x -= this.width;
+
+      if (d.z >= 0.96) {
+        this.deepNutrients = Math.min(8.0, this.deepNutrients + d.mass * 0.03);
+      }
+
+      if (d.age > 50 || d.z >= 1.0 || d.y < 0 || d.y > this.height) {
+        this.detritus.splice(i, 1);
+      }
+    }
+    if (this.deepNutrients > 1.6 && Math.random() < 0.04 * dt * 60) {
+      const upX = Math.random() * this.width;
+      const flow = this.getFlowVector(upX, this.height * 0.5, 0.5);
+      if (flow.w < 0) {
+        this.spawnPlant(upX, Math.random() * (this.height * 0.32), 'biolume_plankton', 0.1 + Math.random() * 0.15);
+        this.deepNutrients = Math.max(0.5, this.deepNutrients - 0.06);
+      }
+    }
+    if (this.deepNutrients > 1.8 && this.plants.length < 480 && Math.random() < 0.08 * dt * 60) {
+      const bx = Math.random() * this.width;
+      const by = this.height * 0.72 + Math.random() * (this.height * 0.25);
+      this.spawnPlant(bx, by, 'bacteria_mat', 0.88 + Math.random() * 0.1);
+      this.deepNutrients = Math.max(0.5, this.deepNutrients - 0.3);
+    }
 
     for (const kelp of this.kelps) {
       const segLen = kelp.height / kelp.segmentCount;
@@ -1228,6 +1688,14 @@ export class EcosystemWorld {
         const edgeX = Math.random() < 0.5 ? 50 : this.width - 50;
         this.spawnCreature('manta', edgeX, this.height * (0.2 + Math.random() * 0.6), 1, undefined, undefined, 'adult');
       }
+      const shrimps = this.creatures.filter(c => c.type === 'cleaner_shrimp');
+      if (shrimps.length < 10 && Math.random() < 0.45) {
+        const coralObs = this.obstacles.filter(o => o.type === 'coral_reef');
+        const targetObs = coralObs.length > 0 ? coralObs[Math.floor(Math.random() * coralObs.length)] : null;
+        const sx = targetObs ? targetObs.x + (Math.random() - 0.5) * 90 : Math.random() * this.width;
+        const sy = targetObs ? targetObs.y + (Math.random() - 0.5) * 90 : Math.random() * this.height;
+        this.spawnCreature('cleaner_shrimp', sx, sy, 1, undefined, undefined, 'adult');
+      }
     }
 
     this.historyTimer += dt;
@@ -1254,7 +1722,7 @@ export class EcosystemWorld {
       egg.hatchTimer += dt;
 
       if (egg.hatchTimer >= egg.maxHatchTime) {
-        const c = this.spawnCreature(egg.type, egg.x, egg.y, egg.generation, egg.dna, egg.brain, 'larva', egg.parentId);
+        const c = this.spawnCreature(egg.type, egg.x, egg.y, egg.generation, egg.dna, egg.brain, 'larva', egg.parentId, egg.z);
         c.energy = egg.energy;
         this.addShockwave(egg.x, egg.y, 25, 'rgba(254, 240, 138, 0.6)');
         this.eggs.splice(i, 1);
@@ -1275,25 +1743,67 @@ export class EcosystemWorld {
       if (sw.life <= 0) this.shockwaves.splice(i, 1);
     }
 
-    if (this.plants.length < 300 && Math.random() < 0.45) {
-      if (this.plants.length > 0 && Math.random() < 0.72) {
-        const parentPlant = this.plants[Math.floor(Math.random() * this.plants.length)];
-        const offAng = Math.random() * Math.PI * 2;
-        const offDist = 15 + Math.random() * 65;
-        this.spawnPlant(parentPlant.x + Math.cos(offAng) * offDist, parentPlant.y + Math.sin(offAng) * offDist, 'algae');
+    if (this.plants.length < 150 && Math.random() < 0.22) {
+      const sy = Math.random() * this.height;
+      const sx = Math.random() * this.width;
+      let pType: Plant['type'] = 'algae';
+      if (sy < this.height * 0.35) {
+        pType = Math.random() < 0.65 ? 'biolume_plankton' : (Math.random() < 0.2 ? 'fruit' : 'marine_snow');
+      } else if (sy < this.height * 0.7) {
+        pType = Math.random() < 0.5 ? 'biolume_plankton' : (Math.random() < 0.25 ? 'algae' : 'marine_snow');
       } else {
-        this.spawnPlant(Math.random() * this.width, Math.random() * this.height, 'algae');
+        pType = Math.random() < 0.4 ? 'deep_coral' : (Math.random() < 0.35 ? 'hydro_spore' : 'marine_snow');
       }
+      this.spawnPlant(sx, sy, pType);
     }
     for (const p of this.plants) {
       if (p.size < p.maxSize) p.size += dt * 0.5;
+
+      if (p.type === 'whale_fall') {
+        p.stageTimer = (p.stageTimer || 0) + dt;
+        const targetFloorY = this.height - 40 - ((p.id * 19) % 30);
+        if (p.y < targetFloorY) {
+          p.y += 18.0 * dt;
+          p.z = Math.min(0.98, (p.z || 0.3) + 0.035 * dt);
+        }
+        if (p.stage === 'flesh' && (p.energy <= 240 || p.stageTimer >= 180)) {
+          p.stage = 'reef';
+          p.stageTimer = 0;
+          p.size = 50.0;
+          p.maxSize = 50.0;
+          p.energy = 450;
+        }
+        else if (p.stage === 'reef') {
+          if (Math.random() < 0.025 * dt * 60 && this.plants.length < 500) {
+            this.spawnPlant(p.x + (Math.random() - 0.5) * 90, p.y + (Math.random() - 0.5) * 45, 'biolume_plankton', p.z);
+          }
+          if (p.stageTimer >= 360) {
+            p.stage = 'mineral';
+            p.stageTimer = 0;
+            p.size = 46.0;
+          }
+        }
+      }
+
+      if (p.type === 'marine_snow') {
+        const flow = this.getFlowVector(p.x, p.y, p.z || 0.5);
+        p.y += (12 + (p.id % 7)) * dt;
+        p.x += (flow.u * 14 + Math.sin(this.totalTime * 1.2 + p.id) * 6) * dt;
+
+        if (p.x < 0) p.x += this.width;
+        if (p.x > this.width) p.x -= this.width;
+        if (p.y >= this.height - 15) {
+          p.y = 20 + Math.random() * 40;
+          p.x = Math.random() * this.width;
+        }
+      }
     }
 
     let currentJellyCount = 0;
     for (const c of this.creatures) {
       if (c.type === 'solar_jelly') currentJellyCount++;
     }
-    const solarShadingFactor = Math.max(0.05, 1.0 - (currentJellyCount / 35));
+    const solarShadingFactor = Math.max(0.05, 1.0 - (currentJellyCount / 15));
     const totalPop = this.creatures.length;
     const overpopFactor = totalPop > 200 ? (totalPop / 200) : 1.0;
 
@@ -1302,13 +1812,16 @@ export class EcosystemWorld {
       if (!c || c.isDead) continue;
 
       c.age += dt;
-      c.finPhase += dt * (c.dna.speed * 4.5);
-      c.pulsePhase += dt * 2.5;
-      c.legPhase += dt * (c.dna.speed * 8.0);
+      c.finPhase += dt * (c.dna.speed * 2.2);
+      c.pulsePhase += dt * 1.5;
+      c.legPhase += dt * (c.dna.speed * 4.0);
 
       if (c.sprintTimer > 0) c.sprintTimer -= dt;
       if (c.electricCooldown > 0) c.electricCooldown -= dt;
       if (c.reproCooldown > 0) c.reproCooldown -= dt;
+      if (c.biteAnimTimer && c.biteAnimTimer > 0) c.biteAnimTimer -= dt;
+      if (c.lungeTimer && c.lungeTimer > 0) c.lungeTimer -= dt;
+      if (c.shellRetractTimer && c.shellRetractTimer > 0) c.shellRetractTimer -= dt;
 
       if (c.stage === 'larva') {
         c.growth += dt * 0.12;
@@ -1321,6 +1834,9 @@ export class EcosystemWorld {
 
       const currentSize = c.dna.size * (0.35 + 0.65 * c.growth);
       c.maxEnergy = currentSize * 22 + 40;
+      if (Math.random() < 0.035 * dt * 60) {
+        this.spawnDetritus(c.x, c.y, c.z, 0.3 + currentSize * 0.08, 'feces');
+      }
 
       let inKelp = false;
       for (const kelp of this.kelps) {
@@ -1342,33 +1858,124 @@ export class EcosystemWorld {
         c.energy -= poisonDmg;
         this.addParticle(c.x, c.y, 0, -1, '#c084fc', 2, 0.4, 'poison_cloud');
       }
-
       if (c.dna.photosynthesis > 0.2) {
-        const gainedSolar = c.dna.photosynthesis * 8.5 * solarShadingFactor * dt;
+        const gainedSolar = c.dna.photosynthesis * 8.5 * solarShadingFactor * this.getLightIntensity(c.z) * dt;
         c.energy = Math.min(c.maxEnergy, c.energy + gainedSolar);
       }
+      c.internalDrive.hunger = Math.max(0, Math.min(1, 1 - (c.energy / c.maxEnergy)));
+      c.internalDrive.reproductiveUrge = (c.stage === 'adult' && c.reproCooldown <= 0 && c.energy >= c.dna.reproEnergy * 0.8)
+        ? Math.min(1, c.energy / c.dna.reproEnergy)
+        : 0;
 
-      const speedCost = (c.dna.speed * (c.sprintTimer > 0 ? 1.5 : 1.0)) ** 2 * 0.009;
-            const sizeCost = (currentSize ** 1.35) * 0.012;
-            const totalCost = (c.dna.metabolism + speedCost + sizeCost) * dt * 11 * overpopFactor;
-            c.energy -= totalCost;
+      if (c.currentAction === 'rest') {
+        c.internalDrive.fatigue = Math.max(0, c.internalDrive.fatigue - dt * 0.12);
+        if (c.internalDrive.fatigue <= 0.15 || c.internalDrive.hunger > 0.65) {
+          c.currentAction = 'idle';
+        }
+      } else {
+        c.internalDrive.fatigue = Math.min(1, c.internalDrive.fatigue + dt * (c.sprintTimer > 0 ? 0.08 : 0.022));
+        if (c.internalDrive.hunger > 0.6) {
+          c.currentAction = 'forage';
+        } else if (c.internalDrive.fatigue > 0.85 && c.internalDrive.hunger < 0.45) {
+          c.currentAction = 'rest';
+        } else if (c.internalDrive.reproductiveUrge > 0.65) {
+          c.currentAction = 'court';
+        } else {
+          c.currentAction = 'idle';
+        }
+      }
 
-            if (c.energy <= 0 || c.age >= c.dna.maxAge) {
-              c.isDead = true;
-              if (c.type === 'chimera' || c.type === 'manta' || currentSize >= 15.0) {
-                this.spawnPlant(c.x, c.y, 'whale_fall');
-                this.addShockwave(c.x, c.y, 100, 'rgba(56, 189, 248, 0.6)');
-              } else {
-                this.spawnPlant(c.x, c.y, 'meat_remains');
-              }
-              for (let k = 0; k < 6; k++) {
-                this.addParticle(c.x, c.y, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, `rgb(${c.dna.color.join(',')})`, 3, 0.8);
-              }
-              continue;
-            }
+      const speedCost = (c.dna.speed * (c.sprintTimer > 0 ? 1.35 : 1.0)) ** 2 * 0.005;
+      const sizeCost = (currentSize ** 1.2) * 0.007;
+      const restingFactor = c.currentAction === 'rest' ? 0.35 : 1.0;
+      const totalCost = (c.dna.metabolism + speedCost + sizeCost) * dt * 7.5 * overpopFactor * restingFactor;
+      c.energy -= totalCost;
 
-            const nearbyCreatures = this.creatureGrid.query(c.x, c.y, c.dna.senseRadius);
+      if (c.energy <= 0 || c.age >= c.dna.maxAge) {
+        c.isDead = true;
+        this.spawnDetritus(c.x, c.y, c.z, 2.5 + currentSize * 0.3, 'carcass');
+        if (c.type === 'chimera' || c.type === 'manta' || currentSize >= 15.0) {
+          this.spawnPlant(c.x, c.y, 'whale_fall', 0.95);
+          this.addShockwave(c.x, c.y, 100, 'rgba(56, 189, 248, 0.6)');
+          for (let sn = 0; sn < 8; sn++) {
+            this.spawnPlant(c.x + (Math.random() - 0.5) * 60, c.y + (Math.random() - 0.5) * 30, 'marine_snow', 0.85);
+            this.spawnDetritus(c.x + (Math.random() - 0.5) * 50, c.y + (Math.random() - 0.5) * 30, c.z, 1.8, 'carcass');
+          }
+        } else {
+          this.spawnPlant(c.x, c.y, 'meat_remains', c.z);
+          const snowCount = 3 + Math.floor(Math.random() * 3);
+          for (let sn = 0; sn < snowCount; sn++) {
+            this.spawnPlant(c.x + (Math.random() - 0.5) * 40, c.y + (Math.random() - 0.5) * 20, 'marine_snow', c.z);
+          }
+        }
+        for (let k = 0; k < 6; k++) {
+          this.addParticle(c.x, c.y, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, `rgb(${c.dna.color.join(',')})`, 3, 0.8);
+        }
+        continue;
+      }
+
+      const nearbyCreatures = this.creatureGrid.query(c.x, c.y, c.dna.senseRadius);
       const nearbyPlants = this.plantGrid.query(c.x, c.y, c.dna.senseRadius);
+      if (c.type === 'anglerfish') {
+        c.anglerLurePhase = (c.anglerLurePhase || 0) + dt * 2.2;
+        c.angle = Math.cos(c.angle) >= 0 ? 0 : Math.PI;
+
+        const facingRight = Math.cos(c.angle) >= 0;
+        const escaDist = currentSize * 2.2;
+        const escaX = c.x + (facingRight ? escaDist : -escaDist);
+        const escaY = c.y - currentSize * 0.4;
+
+        for (const prey of nearbyCreatures) {
+          if (prey.id !== c.id && !prey.isDead && (prey.type === 'herbivore' || prey.type === 'scavenger' || prey.stage === 'larva')) {
+            const distToEsca = Math.hypot(prey.x - escaX, prey.y - escaY);
+            const mouthX = c.x + (facingRight ? currentSize * 1.2 : -currentSize * 1.2);
+            const distToMouth = Math.hypot(prey.x - mouthX, prey.y - c.y);
+            if (distToEsca < 220) {
+              const lureAngle = Math.atan2(escaY - prey.y, escaX - prey.x);
+              let diff = lureAngle - prey.angle;
+              while (diff < -Math.PI) diff += Math.PI * 2;
+              while (diff > Math.PI) diff -= Math.PI * 2;
+              prey.angle += diff * Math.min(1.0, dt * 5.0);
+
+              const pullForce = ((220 - distToEsca) / 220) * 1.6 * dt * 60;
+              prey.x += Math.cos(lureAngle) * pullForce;
+              prey.y += Math.sin(lureAngle) * pullForce;
+            }
+            if (distToMouth < currentSize * 1.8 || distToEsca < currentSize * 1.4) {
+              c.biteAnimTimer = 0.6;
+              const gainedEnergy = prey.energy * 0.95 + 95;
+              c.energy = Math.min(c.maxEnergy, c.energy + gainedEnergy);
+              c.kills++;
+              c.brain.applyHebb(0.08);
+              prey.isDead = true;
+
+              this.recentPredations.push({ x: prey.x, y: prey.y, time: this.totalTime });
+              this.spawnDetritus(prey.x, prey.y, prey.z, 2.0, 'carcass');
+              this.addShockwave(c.x, c.y, 80, 'rgba(34, 211, 238, 0.8)');
+              for (let k = 0; k < 8; k++) {
+                this.addParticle(prey.x, prey.y, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4, '#f43f5e', 3.5, 0.6);
+              }
+              break;
+            }
+          }
+        }
+      }
+      if (nearbyCreatures.length > 4 && c.type !== 'chimera') {
+        let avgX = 0, avgY = 0;
+        for (let k = 0; k < nearbyCreatures.length; k++) {
+          avgX += nearbyCreatures[k].x;
+          avgY += nearbyCreatures[k].y;
+        }
+        avgX /= nearbyCreatures.length;
+        avgY /= nearbyCreatures.length;
+        const pushDx = c.x - avgX;
+        const pushDy = c.y - avgY;
+        const pDist = Math.hypot(pushDx, pushDy) || 0.001;
+        const burstForce = Math.min(8.5, (nearbyCreatures.length - 3) * 0.75);
+        c.x += (pushDx / pDist) * burstForce;
+        c.y += (pushDy / pDist) * burstForce;
+        c.angle = Math.atan2(pushDy, pushDx) + (Math.sin(c.id * 9) * 0.4);
+      }
 
       let closestPlantAngle = 0, closestPlantDist = 1.0;
       let closestThreatAngle = 0, closestThreatDist = 1.0;
@@ -1386,22 +1993,27 @@ export class EcosystemWorld {
           closestPlantAngle = pAng / Math.PI;
           closestPlantDist = d / c.dna.senseRadius;
 
+          const isScavengerFood = p.type === 'meat_remains' || p.type === 'whale_fall' || p.type === 'marine_snow' || p.type === 'bacteria_mat';
+          const canEat = c.dna.photosynthesis < 0.6 && (c.type !== 'scavenger' || isScavengerFood || c.energy < c.maxEnergy * 0.25);
           const eatRadius = c.type === 'manta' ? currentSize * 1.8 + p.size : currentSize + p.size + 3;
-          if (d < eatRadius && c.dna.photosynthesis < 0.6) {
+          if (d < eatRadius && canEat) {
             if (p.type === 'whale_fall') {
-              const bite = Math.min(p.energy, 22);
-              p.energy -= bite;
-              p.size = Math.max(4.0, p.maxSize * (p.energy / 480));
-              c.energy = Math.min(c.maxEnergy, c.energy + bite * (c.type === 'scavenger' ? 1.4 : 1.0));
-              c.plantsEaten++;
-              c.brain.applyHebb(0.04);
-              this.addParticle(p.x, p.y, (Math.random() - 0.5) * 2, -1, '#38bdf8', 2.0, 0.4);
-              if (p.energy <= 0) {
-                const pIdx = this.plants.indexOf(p);
-                if (pIdx !== -1) this.plants.splice(pIdx, 1);
+              if (p.stage === 'flesh') {
+                const bite = Math.min(p.energy, 24);
+                p.energy -= bite;
+                c.energy = Math.min(c.maxEnergy, c.energy + bite * (c.type === 'scavenger' ? 1.4 : 1.1));
+                c.plantsEaten++;
+                c.brain.applyHebb(0.04);
+                this.addParticle(p.x, p.y, (Math.random() - 0.5) * 3, -1, '#f43f5e', 2.5, 0.5);
+              } else if (p.stage === 'reef') {
+                c.energy = Math.min(c.maxEnergy, c.energy + 12 * dt);
+                c.plantsEaten++;
+                c.brain.applyHebb(0.02);
+                this.addParticle(p.x, p.y, (Math.random() - 0.5) * 2, -0.8, '#38bdf8', 1.8, 0.4);
               }
             } else {
-              c.energy = Math.min(c.maxEnergy, c.energy + p.energy * (c.type === 'scavenger' && p.type === 'meat_remains' ? 1.5 : 1.0));
+              const energyGain = (c.type === 'scavenger' && !isScavengerFood) ? p.energy * 0.3 : p.energy * (c.type === 'scavenger' && p.type === 'meat_remains' ? 1.5 : 1.0);
+              c.energy = Math.min(c.maxEnergy, c.energy + energyGain);
               c.plantsEaten++;
               c.brain.applyHebb(0.04);
               this.addParticle(p.x, p.y, 0, -1, p.type === 'meat_remains' ? '#f59e0b' : '#4ade80', 2.5, 0.4);
@@ -1415,25 +2027,66 @@ export class EcosystemWorld {
       let minTD = Infinity, minPrD = Infinity;
       const isCarnivore = c.dna.diet > 0.6;
       const isStarving = c.energy < c.maxEnergy * 0.35;
+      const isLeviathan = c.type === 'chimera';
+      if (isLeviathan && (!c.lungeTimer || c.lungeTimer <= 0)) {
+        let nearbyPreyCount = 0;
+        let clusterCenterX = 0;
+        let clusterCenterY = 0;
+        for (const prey of nearbyCreatures) {
+          if (prey.id !== c.id && !prey.isDead && (prey.type === 'herbivore' || prey.type === 'scavenger' || prey.stage === 'larva')) {
+            nearbyPreyCount++;
+            clusterCenterX += prey.x;
+            clusterCenterY += prey.y;
+          }
+        }
+        if (nearbyPreyCount >= 3) {
+          c.lungeTimer = 1.6;
+          c.biteAnimTimer = 1.6;
+          clusterCenterX /= nearbyPreyCount;
+          clusterCenterY /= nearbyPreyCount;
+          c.angle = Math.atan2(clusterCenterY - c.y, clusterCenterX - c.x);
+          this.addShockwave(c.x, c.y, 140, 'rgba(6, 182, 212, 0.75)');
+        }
+      }
 
       for (const other of nearbyCreatures) {
         if (other.id === c.id || other.isDead) continue;
         const d = Math.hypot(other.x - c.x, other.y - c.y);
+        const otherSize = other.dna.size * (0.35 + 0.65 * other.growth);
+        const minDist = (currentSize + otherSize) * 1.75 + 8;
+        if (d < minDist && d > 0.001) {
+          const overlap = (minDist - d);
+          const nx = (c.x - other.x) / d;
+          const ny = (c.y - other.y) / d;
+          c.x += nx * overlap * 0.45;
+          c.y += ny * overlap * 0.45;
+          other.x -= nx * overlap * 0.45;
+          other.y -= ny * overlap * 0.45;
+        } else if (d <= 0.001) {
+          const randAng = Math.random() * Math.PI * 2;
+          c.x += Math.cos(randAng) * 14;
+          c.y += Math.sin(randAng) * 14;
+        }
+
         let relAng = Math.atan2(other.y - c.y, other.x - c.x) - c.angle;
         while (relAng < -Math.PI) relAng += Math.PI * 2;
         while (relAng > Math.PI) relAng -= Math.PI * 2;
-
-        if (other.dna.parts?.includes('head_angler') && !isCarnivore && d < c.dna.senseRadius * 0.8) {
-          c.angle += (relAng) * 0.05;
+        if ((other.type === 'anglerfish' || other.dna.parts?.includes('head_angler')) && !isCarnivore && d < c.dna.senseRadius * 0.85) {
+          c.angle += (relAng) * 0.08;
+        }
+        if (c.type === 'nautilus' && (other.dna.diet > 0.6 || other.type === 'chimera' || other.type === 'anglerfish') && d < 75) {
+          c.shellRetractTimer = 2.5;
         }
         if (other.type === 'solar_jelly' && c.dna.parts?.includes('body_symbiont') && d < 60) {
           c.energy = Math.min(c.maxEnergy, c.energy + 2.0 * dt);
         }
 
         if (other.dna.diet > 0.6 && !isCarnivore && d < minTD) {
-          minTD = d;
-          closestThreatAngle = relAng / Math.PI;
-          closestThreatDist = d / c.dna.senseRadius;
+          if (other.type !== 'anglerfish' || d < 45) {
+            minTD = d;
+            closestThreatAngle = relAng / Math.PI;
+            closestThreatDist = d / c.dna.senseRadius;
+          }
           if (c.dna.parts?.includes('body_ink') && d < 45 && Math.random() < 0.2) {
             for (let k = 0; k < 5; k++) {
               this.addParticle(c.x, c.y, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, '#0f172a', 6, 1.2, 'smoke');
@@ -1445,11 +2098,11 @@ export class EcosystemWorld {
         if (c.type === 'cleaner_shrimp' && other.id !== c.id && d < 45) {
           if (other.poisonTimer > 0) {
             other.poisonTimer = Math.max(0, other.poisonTimer - dt * 4.0);
-            c.energy = Math.min(c.maxEnergy, c.energy + 14 * dt);
+            c.energy = Math.min(c.maxEnergy, c.energy + 5.0 * dt);
             this.addParticle(other.x, other.y, 0, -0.5, '#38bdf8', 2, 0.3, 'bubble');
           } else {
-            other.energy = Math.min(other.maxEnergy, other.energy + 8 * dt);
-            c.energy = Math.min(c.maxEnergy, c.energy + 10 * dt);
+            other.energy = Math.min(other.maxEnergy, other.energy + 3.5 * dt);
+            c.energy = Math.min(c.maxEnergy, c.energy + 2.8 * dt);
           }
         }
 
@@ -1460,27 +2113,50 @@ export class EcosystemWorld {
             break;
           }
         }
-        const otherHidden = otherInKelp && (other.dna.size * (0.35 + 0.65 * other.growth)) < 8.5;
+        let inWhaleShelter = false;
+        for (const wp of this.plants) {
+          if (wp.type === 'whale_fall' && wp.stage === 'mineral' && Math.hypot(other.x - wp.x, other.y - wp.y) < 65) {
+            inWhaleShelter = true;
+            break;
+          }
+        }
+        const otherHidden = (otherInKelp || inWhaleShelter) && (other.dna.size * (0.35 + 0.65 * other.growth)) < 8.5;
 
-        const isEdible = (other.type === 'herbivore' || other.stage === 'larva' || (isStarving && other.type === 'solar_jelly')) && other.type !== 'cleaner_shrimp';
+        const isEdible = (other.type === 'herbivore' || other.type === 'scavenger' || other.stage === 'larva' || (isStarving && other.type === 'solar_jelly')) && other.type !== 'cleaner_shrimp';
         if (isCarnivore && isEdible && d < minPrD && !otherHidden && (other.dna.camouflage < 0.65 || Math.random() < 0.15)) {
           minPrD = d;
           closestPreyAngle = relAng / Math.PI;
           closestPreyDist = d / c.dna.senseRadius;
 
           const otherSize = other.dna.size * (0.35 + 0.65 * other.growth);
-          if (d < currentSize + otherSize + 4) {
-            const armorBlock = Math.max(0, other.dna.armor - c.dna.biteForce);
-            if (armorBlock > 0.4 && Math.random() < armorBlock) {
-              c.stunTimer = 0.8;
+          if (d < currentSize + otherSize + 32) {
+            c.biteAnimTimer = Math.max(c.biteAnimTimer || 0, 0.45);
+          }
+
+          const isLunging = isLeviathan && (c.lungeTimer || 0) > 0;
+          const swallowRadius = isLunging ? currentSize * 2.6 : (currentSize + otherSize + 4);
+
+          if (d < swallowRadius) {
+            c.biteAnimTimer = Math.max(c.biteAnimTimer || 0, 0.4);
+            const isNautilusRetracted = other.type === 'nautilus' && (other.shellRetractTimer || 0) > 0;
+            const armorBlock = isNautilusRetracted ? 1.0 : Math.max(0, other.dna.armor - c.dna.biteForce);
+
+            if (isNautilusRetracted || (armorBlock > 0.4 && Math.random() < armorBlock)) {
+              c.stunTimer = 0.9;
               c.brain.applyHebb(-0.06);
-              this.addParticle(c.x, c.y, 0, 0, '#38bdf8', 4, 0.4, 'spark');
+              this.addParticle(other.x, other.y, 0, 0, '#facc15', 5, 0.5, 'spark');
             } else {
-              const gainedEnergy = other.energy * 0.85 + 70;
+              const gainedEnergy = other.energy * 0.95 + 95;
               c.energy = Math.min(c.maxEnergy, c.energy + gainedEnergy);
               c.kills++;
-              c.brain.applyHebb(0.05);
+              if (c.type !== 'chimera') {
+                c.reproCooldown = Math.max(0, c.reproCooldown - 2.5);
+              }
+              c.brain.applyHebb(0.06);
               other.isDead = true;
+
+              this.recentPredations.push({ x: other.x, y: other.y, time: this.totalTime });
+              this.spawnDetritus(other.x, other.y, other.z, 2.0, 'carcass');
 
               if (other.dna.poison > 0.35 && c.dna.poisonResist < 0.6) {
                 c.poisonTimer = 8.0;
@@ -1549,15 +2225,16 @@ export class EcosystemWorld {
           for (const other of nearbyCreatures) {
             if (other.id === c.id || other.dna.diet > 0.55) continue;
             const dist = Math.hypot(other.x - c.x, other.y - c.y);
-            if (dist < c.dna.senseRadius * 0.7) {
+            if (dist < c.dna.senseRadius * 0.6) {
               flockCount++;
               avgSin += Math.sin(other.angle);
               avgCos += Math.cos(other.angle);
               centerX += other.x;
               centerY += other.y;
-              if (dist < currentSize * 2.5 && dist > 0) {
-                sepX -= (other.x - c.x) / dist;
-                sepY -= (other.y - c.y) / dist;
+              if (dist < currentSize * 5.5 && dist > 0) {
+                const force = (currentSize * 5.5 - dist) / (currentSize * 5.5);
+                sepX -= ((other.x - c.x) / dist) * force;
+                sepY -= ((other.y - c.y) / dist) * force;
               }
             }
           }
@@ -1575,22 +2252,35 @@ export class EcosystemWorld {
             let diffAli = aliAngle - c.angle;
             while (diffAli < -Math.PI) diffAli += Math.PI * 2;
             while (diffAli > Math.PI) diffAli -= Math.PI * 2;
-
-            let combined = diffCoh * 0.35 + diffAli * 0.45;
-            if (Math.hypot(sepX, sepY) > 0.1) {
+            const dynamicBoidCoh = flockCount > 5 ? 0.0 : (0.12 * (1 - flockCount / 6));
+            let combined = diffCoh * dynamicBoidCoh + diffAli * 0.35;
+            if (Math.hypot(sepX, sepY) > 0.02) {
               const sepAngle = Math.atan2(sepY, sepX);
               let diffSep = sepAngle - c.angle;
               while (diffSep < -Math.PI) diffSep += Math.PI * 2;
               while (diffSep > Math.PI) diffSep -= Math.PI * 2;
-              combined += diffSep * 0.6;
+              combined += diffSep * 2.4;
             }
             boidsSteer = Math.max(-1.0, Math.min(1.0, combined));
           }
         }
       }
 
-      const finalSteer = boidsSteer !== 0 ? (outSteer * 0.3 + boidsSteer * 0.7) : outSteer;
-      c.angle += finalSteer * c.dna.turnSpeed;
+      const finalSteer = boidsSteer !== 0 ? (outSteer * 0.15 + boidsSteer * 0.85) : outSteer;
+
+      if (c.type === 'chimera') {
+        const maxSteerDelta = 0.022;
+        const clampedSteer = Math.max(-maxSteerDelta, Math.min(maxSteerDelta, finalSteer * c.dna.turnSpeed));
+        c.angle += clampedSteer;
+      } else if (c.type === 'anglerfish') {
+        if (Math.abs(finalSteer) > 0.35) {
+          c.angle = finalSteer > 0 ? 0 : Math.PI;
+        }
+      } else {
+        const maxSteerDelta = c.dna.diet > 0.6 ? 0.035 : 0.048;
+        const clampedSteer = Math.max(-maxSteerDelta, Math.min(maxSteerDelta, finalSteer * c.dna.turnSpeed));
+        c.angle += clampedSteer;
+      }
 
       if ((outSprint > 0.6 || panicSprint) && c.energy > 30) {
         c.sprintTimer = panicSprint ? 0.7 : 0.4;
@@ -1608,13 +2298,78 @@ export class EcosystemWorld {
           }
         }
       }
+      const isNight = (this.totalTime % 3600) < 1800;
+      if (c.dna.diet > 0.6) {
+        const targetZ = isNight ? 0.75 : 0.45;
+        c.vz += (targetZ - c.z) * 0.002 * dt * 60;
+      } else if (c.type === 'solar_jelly') {
+        c.vz += (0.1 - c.z) * 0.003 * dt * 60;
+        if (nearbyCreatures.length > 3) {
+          c.pulsePhase += dt * 4.0;
+          c.x += Math.cos(c.angle) * 2.2 * dt * 60;
+          c.y += Math.sin(c.angle) * 2.2 * dt * 60;
+        }
+      } else if (c.type === 'scavenger') {
+        c.vz += (0.9 - c.z) * 0.004 * dt * 60;
+      } else if (c.type === 'anglerfish') {
+        c.vz += (0.88 - c.z) * 0.005 * dt * 60;
+      } else if (c.type === 'nautilus') {
+        const buoyancyTargetZ = 0.35 + Math.sin(this.totalTime * 0.25 + c.id) * 0.35;
+        c.vz += (buoyancyTargetZ - c.z) * 0.003 * dt * 60;
+      } else {
+        const targetZ = isNight ? 0.2 : 0.5;
+        c.vz += (targetZ - c.z) * 0.002 * dt * 60;
+      }
 
-      const throttleSpeed = c.dna.speed * (0.3 + 0.7 * outThrottle) * (c.sprintTimer > 0 ? 1.45 : 1.0);
-      c.vx = Math.cos(c.angle) * throttleSpeed;
-      c.vy = Math.sin(c.angle) * throttleSpeed;
+      if (c.type === 'scavenger') {
+        const targetBenthicY = this.height * 0.85;
+        if (c.y < targetBenthicY) {
+          c.vy += 0.85 * dt * 60;
+          let downAngle = Math.PI / 2;
+          let diffDown = downAngle - c.angle;
+          while (diffDown < -Math.PI) diffDown += Math.PI * 2;
+          while (diffDown > Math.PI) diffDown -= Math.PI * 2;
+          c.angle += diffDown * 0.08;
+        }
+      }
 
-      c.x += c.vx * dt * 60;
-      c.y += c.vy * dt * 60;
+      if (c.type === 'anglerfish') {
+        const yOffset = (((c.id * 47) % 100) / 100 - 0.5) * 140;
+        const targetBenthicY = Math.min(this.height - 35, Math.max(this.height * 0.78, this.height * 0.86 + yOffset));
+        c.y += (targetBenthicY - c.y) * 0.04 * dt * 60;
+        c.vy = 0;
+        c.angle = Math.cos(c.angle) >= 0 ? 0 : Math.PI;
+      }
+
+      const isResting = c.currentAction === 'rest';
+      const isLungingSpeed = (c.type === 'chimera' && (c.lungeTimer || 0) > 0) ? 2.8 : 1.0;
+      const isAnglerSnapping = c.type === 'anglerfish' && (c.biteAnimTimer || 0) > 0;
+      const anglerSpeedMod = c.type === 'anglerfish' ? (isAnglerSnapping ? 3.5 : 0.45) : 1.0;
+      const nautilusMod = (c.type === 'nautilus' && (c.shellRetractTimer || 0) > 0) ? 0.05 : 1.0;
+
+      const throttleSpeed = isResting
+        ? (c.dna.speed * 0.05)
+        : (c.dna.speed * (0.3 + 0.7 * outThrottle) * (c.sprintTimer > 0 ? 1.45 : 1.0) * isLungingSpeed * anglerSpeedMod * nautilusMod);
+
+      const targetVx = Math.cos(c.angle) * throttleSpeed;
+      const targetVy = c.type === 'anglerfish' ? 0 : Math.sin(c.angle) * throttleSpeed;
+      const glideRate = c.dna.diet > 0.6 ? 0.05 : 0.08;
+      c.vx += (targetVx - c.vx) * glideRate * dt * 60;
+      c.vy += (targetVy - c.vy) * glideRate * dt * 60;
+
+      const maxVz = c.dna.speed * 0.35 * 0.01;
+      c.vz = Math.max(-maxVz, Math.min(maxVz, c.vz));
+
+      const flow = this.getFlowVector(c.x, c.y, c.z);
+      const flowAlignment = (c.vx * flow.u + c.vy * flow.v);
+      if (flowAlignment > 0.1) {
+        c.energy = Math.min(c.maxEnergy, c.energy + 0.4 * dt);
+      }
+
+      c.x += (c.vx + flow.u * 0.25) * dt * 60;
+      c.y += (c.vy + flow.v * 0.25) * dt * 60;
+      c.z += (c.vz + flow.w) * dt * 60;
+      c.z = Math.max(0.0, Math.min(1.0, c.z));
 
       const pad = 20;
       if (c.x < pad) { c.x = pad; c.angle = Math.PI - c.angle; }
@@ -1638,16 +2393,104 @@ export class EcosystemWorld {
       }
 
       const isJelly = c.type === 'solar_jelly';
-      const allowBreed = isJelly ? (currentJellyCount < 35) : (totalPop < 220);
+      const isScav = c.type === 'scavenger';
+      const isChimera = c.type === 'chimera';
+      const isShrimp = c.type === 'cleaner_shrimp';
+      const isAngler = c.type === 'anglerfish';
+      const isRedCarn = c.dna.diet > 0.6 && !isChimera && !isAngler;
+      const currentCarnCount = this.creatures.filter(x => x.dna.diet > 0.6 && x.type !== 'chimera' && x.type !== 'anglerfish').length + this.eggs.filter(x => x.dna.diet > 0.6 && x.type !== 'chimera' && x.type !== 'anglerfish').length;
+      const currentScavCount = this.creatures.filter(x => x.type === 'scavenger').length;
+      const currentChimeraCount = this.creatures.filter(x => x.type === 'chimera').length + this.eggs.filter(x => x.type === 'chimera').length;
+      const currentShrimpCount = this.creatures.filter(x => x.type === 'cleaner_shrimp').length + this.eggs.filter(x => x.type === 'cleaner_shrimp').length;
+      const currentAnglerCount = this.creatures.filter(x => x.type === 'anglerfish').length + this.eggs.filter(x => x.type === 'anglerfish').length;
+      const totalLoad = totalPop + this.eggs.length;
+      const allowBreed = isChimera
+        ? (currentChimeraCount < 2 && totalLoad < 220)
+        : isRedCarn
+        ? (currentCarnCount < 5 && totalLoad < 220)
+        : isShrimp
+        ? (currentShrimpCount < 16 && totalLoad < 220)
+        : isAngler
+        ? (currentAnglerCount < 6 && totalLoad < 220)
+        : isJelly
+        ? (currentJellyCount < 15 && totalLoad < 220)
+        : isScav
+        ? (currentScavCount < 30 && totalLoad < 220)
+        : (totalLoad < 220);
 
       if (c.stage === 'adult' && allowBreed && c.reproCooldown <= 0 && c.energy >= c.dna.reproEnergy) {
         c.energy *= 0.35;
-        c.reproCooldown = 8.0;
+        c.reproCooldown = isChimera ? 50.0 : isShrimp ? 25.0 : 8.0;
         c.children++;
         this.layEggs(c);
       }
 
       this.checkSpeciesDiscovery(c);
+    }
+    this.swarms = this.swarms.filter(s => {
+      s.members = s.members.filter(m => !m.isDead);
+      return s.members.length >= 2;
+    });
+
+    const unassignedHerbs = this.creatures.filter(c => c.type === 'herbivore' && !c.isDead && !this.swarms.some(s => s.members.includes(c)));
+    for (let h = 0; h < unassignedHerbs.length; h++) {
+      const c1 = unassignedHerbs[h];
+      const cluster = unassignedHerbs.filter(c2 => Math.hypot(c2.x - c1.x, c2.y - c1.y) < 110);
+      if (cluster.length >= 3) {
+        const newSwarm = new Swarm(this.nextSwarmId++);
+        newSwarm.members = cluster;
+        this.swarms.push(newSwarm);
+      }
+    }
+
+    for (const s of this.swarms) {
+      s.update(dt, this.creatures);
+      s.applyToMembers(dt);
+    }
+    this.entropyMap.fill(0);
+    this.recentPredations = this.recentPredations.filter(p => (this.totalTime - p.time) <= 5.0);
+
+    const cellW = this.width / 20;
+    const cellH = this.height / 20;
+
+    for (const pred of this.recentPredations) {
+      const cx = Math.max(0, Math.min(19, Math.floor(pred.x / cellW)));
+      const cy = Math.max(0, Math.min(19, Math.floor(pred.y / cellH)));
+      this.entropyMap[cy * 20 + cx] += 0.5;
+    }
+
+    for (const s of this.swarms) {
+      const cx = Math.max(0, Math.min(19, Math.floor(s.centroid.x / cellW)));
+      const cy = Math.max(0, Math.min(19, Math.floor(s.centroid.y / cellH)));
+      this.entropyMap[cy * 20 + cx] += s.members.length * 0.3 * (s.scatterTimer > 0 ? 2.0 : 1.0);
+    }
+
+    for (const d of this.detritus) {
+      if (d.z > 0.8) {
+        const cx = Math.max(0, Math.min(19, Math.floor(d.x / cellW)));
+        const cy = Math.max(0, Math.min(19, Math.floor(d.y / cellH)));
+        this.entropyMap[cy * 20 + cx] += 0.02 * 0.2;
+      }
+    }
+
+    let maxE = 0;
+    let bestCell = { cx: 10, cy: 10 };
+    for (let idx = 0; idx < 400; idx++) {
+      if (this.entropyMap[idx] > maxE) {
+        maxE = this.entropyMap[idx];
+        bestCell = { cx: idx % 20, cy: Math.floor(idx / 20) };
+      }
+    }
+    this.entropyPeakValue = maxE;
+    this.entropyMaxPos = {
+      x: (bestCell.cx + 0.5) * cellW,
+      y: (bestCell.cy + 0.5) * cellH
+    };
+    const mineralWhales = this.plants.filter(p => p.type === 'whale_fall' && p.stage === 'mineral');
+    if (mineralWhales.length > 3) {
+      const oldestMineral = mineralWhales[0];
+      const pIdx = this.plants.indexOf(oldestMineral);
+      if (pIdx !== -1) this.plants.splice(pIdx, 1);
     }
 
     this.creatures = this.creatures.filter(c => !c.isDead);
@@ -1666,18 +2509,46 @@ export class EcosystemWorld {
     if (this.creatures.filter(c => c.type === 'herbivore').length < 8) {
       this.spawnCreature('herbivore', Math.random() * this.width, Math.random() * this.height, 1, undefined, undefined, 'adult');
     }
-    if (this.creatures.filter(c => c.dna.diet > 0.6).length < 2) {
-      this.spawnCreature('carnivore', Math.random() * this.width, Math.random() * this.height, 1, undefined, undefined, 'adult');
+    if (this.creatures.filter(c => c.dna.diet > 0.6 && c.type !== 'chimera' && c.type !== 'anglerfish').length < 4) {
+      this.spawnCreature('carnivore', Math.random() * this.width, this.height * (0.3 + Math.random() * 0.4), 1, undefined, undefined, 'adult');
+    }
+    if (this.creatures.filter(c => c.type === 'scavenger').length < 5) {
+      const scavY = this.height * 0.75 + Math.random() * (this.height * 0.22);
+      this.spawnCreature('scavenger', Math.random() * this.width, scavY, 1, undefined, undefined, 'adult');
+    }
+    if (this.creatures.filter(c => c.type === 'solar_jelly').length < 5) {
+      this.spawnCreature('solar_jelly', Math.random() * this.width, Math.random() * (this.height * 0.35), 1, undefined, undefined, 'adult');
+    }
+    if (this.creatures.filter(c => c.type === 'cleaner_shrimp').length < 6) {
+          this.spawnCreature('cleaner_shrimp', Math.random() * this.width, this.height * (0.6 + Math.random() * 0.25), 1, undefined, undefined, 'adult');
+        }
+        const currentRedCarns = this.creatures.filter(c => c.dna.diet > 0.55 && c.type !== 'chimera' && c.type !== 'anglerfish' && !c.isDead);
+        if (currentRedCarns.length > 4) {
+          for (let k = 4; k < currentRedCarns.length; k++) {
+            currentRedCarns[k].isDead = true;
+          }
+        } else if (currentRedCarns.length < 3) {
+          this.spawnCreature('carnivore', Math.random() * this.width, this.height * (0.3 + Math.random() * 0.4), 1, undefined, undefined, 'adult');
+        }
+    if (this.creatures.filter(c => c.type === 'anglerfish').length < 4) {
+      const angY = this.height * (0.80 + Math.random() * 0.12);
+      this.spawnCreature('anglerfish', Math.random() * this.width, angY, 1, undefined, undefined, 'adult');
     }
   }
 
   applyMeteor(wx: number, wy: number, radius = 140) {
     this.addShockwave(wx, wy, radius * 1.5, 'rgba(249, 115, 22, 0.8)');
+    for (let i = this.detritus.length - 1; i >= 0; i--) {
+      if (Math.hypot(this.detritus[i].x - wx, this.detritus[i].y - wy) < radius) {
+        this.detritus.splice(i, 1);
+      }
+    }
     for (let i = this.creatures.length - 1; i >= 0; i--) {
       const c = this.creatures[i];
       if (Math.hypot(c.x - wx, c.y - wy) < radius) {
         c.isDead = true;
         this.spawnPlant(c.x, c.y, 'meat_remains');
+        this.spawnDetritus(c.x, c.y, c.z, 3.0, 'carcass');
         this.creatures.splice(i, 1);
       }
     }
